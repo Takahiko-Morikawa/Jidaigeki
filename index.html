@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>時代劇 ネコ忍者サバイバル Ver 1.13</title>
+    <style>
+        /* レイアウトを完全に継承 */
+        body { margin: 0; overflow: hidden; background: #fff; font-family: 'Hiragino Mincho ProN', 'MS Mincho', serif; }
+        canvas { display: block; touch-action: none; background: #fff; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+        .screen-text { color: #333; font-weight: bold; text-align: center; pointer-events: auto; cursor: pointer; }
+        #title-screen { background: rgba(255,255,255,0.9); width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+        #hp-display { position: absolute; top: 10px; left: 10px; font-size: 24px; color: #ff4757; pointer-events: none; font-weight: bold; font-family: sans-serif; }
+        .version-tag { position: absolute; bottom: 10px; right: 10px; font-size: 14px; color: #bbb; font-family: sans-serif; }
+        #overlay-text { font-size: 60px; color: #333; display: none; text-shadow: 2px 2px 0px #fff; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="hp-display" style="display:none;">HP: ❤️❤️❤️</div>
+        <div id="overlay-text"></div>
+
+        <div id="title-screen" class="screen-text" onclick="startGame()">
+            <p style="font-size: 20px; color: #888; margin-bottom: -10px; letter-spacing: 0.5em;">― 時代劇 ―</p>
+            <h1 style="font-size: 46px; margin-bottom: 5px; border-top: 2px solid #333; border-bottom: 2px solid #333; padding: 10px 0;">ネコ忍者サバイバル</h1>
+            <p style="font-size: 24px; color: #ff4757; margin-top: 20px;">[ タップして開始 ]</p>
+            <div class="version-tag">Ver 1.13</div>
+        </div>
+
+        <div id="gameover-screen" class="screen-text" style="display:none;" onclick="resetToTitle()">
+            <h1 style="font-size: 60px; color: #333;">GAME OVER</h1>
+            <p style="font-size: 20px; color: #ff4757;">[ タップしてタイトルへ ]</p>
+        </div>
+
+        <div id="end-screen" class="screen-text" style="display:none;" onclick="resetToTitle()">
+            <h1 style="font-size: 60px; color: #ff4757;">THE END</h1>
+            <p style="font-size: 20px; color: #333;">[ タップでタイトルへ ]</p>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const ui = {
+            title: document.getElementById('title-screen'),
+            end: document.getElementById('end-screen'),
+            over: document.getElementById('gameover-screen'),
+            hp: document.getElementById('hp-display'),
+            overlay: document.getElementById('overlay-text')
+        };
+
+        const MAP_SIZE = 1500;
+        let gameState = 'TITLE';
+        let currentStage = 1;
+        let player, enemies = [], effects = [], particles = [], projectiles = [];
+        let joystick = { active: false, startX: 0, startY: 0, curX: 0, curY: 0 };
+        let camera = { x: 0, y: 0 };
+        let frameCount = 0;
+
+        // 画像の読み込み
+        const playerImg = new Image(); playerImg.src = 'player_cat_ninja.png';
+        const enemyImg = new Image(); enemyImg.src = 'enemy_black_ninja.png';
+        const yojimboImg = new Image(); yojimboImg.src = 'yojimbo.png';
+        let imgsReady = 0;
+        [playerImg, enemyImg, yojimboImg].forEach(img => img.onload = () => imgsReady++);
+
+        function initStage(stageNum) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            currentStage = stageNum;
+            particles = []; 
+            effects = [];
+            projectiles = [];
+            
+            player = { x: MAP_SIZE/2, y: MAP_SIZE/2 + 300, w: 64, h: 64, speed: 6, hp: 3 };
+            enemies = [];
+
+            if(stageNum === 1) {
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'ICHINOSUKE'));
+            } else if(stageNum === 2) {
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'NINJA'));
+                enemies.push(createEnemy(MAP_SIZE/2 + 400, MAP_SIZE/2, 'NINJA'));
+            } else if(stageNum === 3) {
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'NINJA'));
+                enemies.push(createEnemy(MAP_SIZE/2 + 400, MAP_SIZE/2, 'NINJA'));
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 + 400, 'NINJA'));
+            } else if(stageNum === 4) { // FINAL STAGE
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'NINJA'));
+                enemies.push(createEnemy(MAP_SIZE/2 + 400, MAP_SIZE/2, 'NINJA'));
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 + 400, 'NINJA'));
+                enemies.push(createEnemy(MAP_SIZE/2 - 400, MAP_SIZE/2, 'NINJA'));
+                enemies.push(createEnemy(MAP_SIZE/2 - 300, MAP_SIZE/2 - 300, 'NINJA'));
+            }
+
+            updateHP();
+            updateCamera();
+            gameState = 'STAGE_START';
+            let stageText = stageNum === 4 ? "FINAL STAGE" : `STAGE ${stageNum}`;
+            showOverlay(stageText, 1500, () => { gameState = 'PLAYING'; });
+        }
+
+        function createEnemy(x, y, type) {
+            return {
+                x, y, w: 64, h: 64, type, alive: true,
+                moveStep: 0, pauseTimer: 0, attackPrepTimer: 0, stunTimer: 0,
+                rotation: 0, quotes: [],
+                shotgunCooldown: 0, swordGlint: 0, shotgunReadyTimer: 0,
+                shuriken: { x: 0, y: 0, vx: 0, vy: 0, state: 'HELD', timer: 0 }
+            };
+        }
+
+        function showOverlay(text, duration, callback) {
+            ui.overlay.style.display = 'block';
+            ui.overlay.innerHTML = text;
+            setTimeout(() => {
+                ui.overlay.style.display = 'none';
+                if(callback) callback();
+            }, duration);
+        }
+
+        function updateHP() {
+            let hearts = "";
+            for(let i=0; i<player.hp; i++) hearts += "❤️";
+            ui.hp.innerHTML = "HP: " + (player.hp <= 0 ? "💀" : hearts);
+        }
+
+        function startGame() { 
+            ui.title.style.display = 'none';
+            ui.hp.style.display = 'block';
+            initStage(1);
+        }
+
+        function resetToTitle() { 
+            gameState = 'TITLE'; 
+            ui.title.style.display = 'flex'; 
+            ui.end.style.display = 'none'; 
+            ui.over.style.display = 'none';
+            ui.hp.style.display = 'none';
+        }
+
+        function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+        function update() {
+            if (gameState === 'PLAYING') updatePlaying();
+            if (gameState === 'ENDING' || gameState === 'GAMEOVER' || gameState === 'STAGE_START' || gameState === 'STAGE_CLEAR_WAIT') {
+                updateParticlesOnly();
+            }
+        }
+
+        function updateCamera() {
+            camera.x = Math.max(0, Math.min(MAP_SIZE - canvas.width, player.x - canvas.width/2));
+            camera.y = Math.max(0, Math.min(MAP_SIZE - canvas.height, player.y - canvas.height/2));
+        }
+
+        function updatePlaying() {
+            if (joystick.active) {
+                const dx = joystick.curX - joystick.startX, dy = joystick.curY - joystick.startY;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 10) { player.x += (dx / dist) * player.speed; player.y += (dy / dist) * player.speed; }
+            }
+            player.x = Math.max(32, Math.min(MAP_SIZE - 32, player.x));
+            player.y = Math.max(32, Math.min(MAP_SIZE - 32, player.y));
+            updateCamera();
+
+            enemies.forEach(en => {
+                if (!en.alive) return;
+                const distToPlayer = Math.hypot(player.x - en.x, player.y - en.y);
+
+                if (en.type === 'NINJA') {
+                    // --- 忍者AI (0.3秒静止) ---
+                    if (en.stunTimer > 0) {
+                        en.stunTimer--; if (en.stunTimer === 0) en.shuriken.state = 'HELD';
+                    } else if (en.attackPrepTimer > 0) {
+                        en.attackPrepTimer--; if (en.attackPrepTimer === 0) throwShuriken(en);
+                    } else if (en.pauseTimer > 0) {
+                        en.pauseTimer--;
+                    } else {
+                        let targetX, targetY, speed;
+                        if (en.shuriken.state === 'HELD') {
+                            targetX = player.x; targetY = player.y; speed = 3.5;
+                            if (distToPlayer < 350) {
+                                en.attackPrepTimer = 60;
+                                effects.push({ x: en.x, y: en.y, type: 'BLUE', timer: 60, owner: en });
+                                return;
+                            }
+                        } else {
+                            targetX = en.shuriken.x; targetY = en.shuriken.y; speed = 3;
+                            if (en.shuriken.state === 'DROPPED' && Math.hypot(en.x - en.shuriken.x, en.y - en.shuriken.y) < 25) {
+                                en.stunTimer = 120; return;
+                            }
+                        }
+                        const angle = Math.atan2(targetY - en.y, targetX - en.x);
+                        en.x += Math.cos(angle) * speed; en.y += Math.sin(angle) * speed;
+                        en.moveStep++;
+                        if (en.moveStep >= 30) { en.moveStep = 0; en.pauseTimer = 18; }
+                    }
+                    if (en.shuriken.state === 'FLYING') {
+                        en.shuriken.x += en.shuriken.vx; en.shuriken.y += en.shuriken.vy; en.shuriken.timer--;
+                        if (Math.hypot(player.x - en.shuriken.x, player.y - en.shuriken.y) < 25) hitPlayer(1, 'PROJECTILE');
+                        if (en.shuriken.timer <= 0) { en.shuriken.state = 'DROPPED'; en.shuriken.vx = 0; en.shuriken.vy = 0; }
+                    }
+                } else if (en.type === 'ICHINOSUKE') {
+                    // --- 市之助AI (0.4秒静止) ---
+                    if (en.shotgunCooldown > 0) {
+                        en.shotgunCooldown--;
+                        if (en.shotgunCooldown === 0) {
+                            en.quotes.push({text: "装填ッ", timer: 60, color: "blue"});
+                            en.shotgunReadyTimer = 60; 
+                        }
+                    }
+                    if (en.shotgunReadyTimer > 0) en.shotgunReadyTimer--;
+
+                    if (en.pauseTimer > 0) {
+                        en.pauseTimer--;
+                    } else if (en.attackPrepTimer > 0) {
+                        en.attackPrepTimer--;
+                        if (en.attackPrepTimer === 0) executeIchinosukeAttack(en);
+                    } else {
+                        if (distToPlayer < 100) { 
+                            en.attackPrepTimer = 45; 
+                            en.swordGlint = 45;
+                        } else if (en.shotgunCooldown === 0 && en.shotgunReadyTimer === 0 && distToPlayer < 500) {
+                            en.attackPrepTimer = 60; 
+                            en.quotes.push({text: "鉛玉くらえッ", timer: 60, color: "black"});
+                        } else {
+                            const angle = Math.atan2(player.y - en.y, player.x - en.x);
+                            en.x += Math.cos(angle) * 2; en.y += Math.sin(angle) * 2;
+                            en.moveStep++;
+                            if (en.moveStep >= 40) { en.moveStep = 0; en.pauseTimer = 24; }
+                        }
+                    }
+                }
+            });
+
+            projectiles.forEach((p, idx) => {
+                p.x += p.vx; p.y += p.vy; p.life--;
+                if (Math.hypot(player.x - p.x, player.y - p.y) < 20) {
+                    hitPlayer(1, 'PROJECTILE'); projectiles.splice(idx, 1);
+                } else if (p.life <= 0) projectiles.splice(idx, 1);
+            });
+
+            effects = effects.filter(e => {
+                e.timer--; if (e.type === 'BLUE') { e.x = e.owner.x; e.y = e.owner.y; }
+                return e.timer > 0;
+            });
+            updateParticlesOnly();
+        }
+
+        function throwShuriken(en) {
+            const angle = Math.atan2(player.y - en.y, player.x - en.x);
+            en.shuriken.x = en.x; en.shuriken.y = en.y;
+            en.shuriken.vx = Math.cos(angle) * 5;
+            en.shuriken.vy = Math.sin(angle) * 5;
+            en.shuriken.state = 'FLYING'; en.shuriken.timer = 60;
+        }
+
+        function executeIchinosukeAttack(en) {
+            const dist = Math.hypot(player.x - en.x, player.y - en.y);
+            if (en.swordGlint > 0) { 
+                if (dist < 120) hitPlayer(3, 'SWORD', en);
+                en.swordGlint = 0;
+            } else { 
+                const angle = Math.atan2(player.y - en.y, player.x - en.x);
+                // 5方向に飛ぶ
+                for (let i = -2; i <= 2; i++) {
+                    const a = angle + i * 0.25;
+                    projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a) * 7, vy: Math.sin(a) * 7, life: 80 });
+                }
+                en.shotgunCooldown = 480; 
+            }
+        }
+
+        function hitPlayer(dmg, type, attacker = null) {
+            player.hp -= dmg; if (player.hp < 0) player.hp = 0;
+            updateHP();
+            const isDead = player.hp <= 0;
+            const pCount = isDead ? 150 : 20; 
+            for(let i=0; i<pCount; i++) {
+                const a = Math.random() * Math.PI * 2, s = Math.random() * (isDead ? 18 : 8);
+                particles.push({ x: player.x, y: player.y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, color: '#c0392b', life: 70, size: isDead ? 6 : 4 });
+            }
+            if (isDead) {
+                gameState = 'GAMEOVER'; frameCount = 0;
+                if (type === 'SWORD' && attacker) attacker.quotes.push({text: "フハハハハ", timer: 120, color: "black"});
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (gameState === 'TITLE') return;
+
+            ctx.save(); ctx.translate(-camera.x, -camera.y);
+            ctx.strokeStyle = "#f0f0f0"; ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+
+            enemies.forEach(en => {
+                if (en.type === 'NINJA' && en.shuriken.state !== 'HELD') {
+                    ctx.fillStyle = "#7f8c8d"; ctx.save(); ctx.translate(en.shuriken.x, en.shuriken.y);
+                    ctx.rotate(en.shuriken.state === 'FLYING' ? Date.now()*0.02 : Math.PI/4);
+                    ctx.fillRect(-15, -2, 30, 4); ctx.fillRect(-2, -15, 4, 30); ctx.restore();
+                }
+
+                ctx.save(); ctx.translate(en.x, en.y);
+                const aliveEnemies = enemies.filter(e => e.alive).length;
+                if (!en.alive && (aliveEnemies > 0 || currentStage > 1)) ctx.rotate(Math.PI/2);
+                
+                let img = en.type === 'NINJA' ? enemyImg : yojimboImg;
+                if (imgsReady >= 3) ctx.drawImage(img, -32, -32, 64, 64);
+                else { ctx.fillStyle = en.type==='NINJA'?"#000":"#444"; ctx.fillRect(-20, -20, 40, 40); }
+
+                // 抜刀演出 (視覚的な刀を描画)
+                if (en.swordGlint > 0) {
+                    ctx.save();
+                    ctx.rotate(-Math.PI/4);
+                    ctx.fillStyle = "#eee"; // 刀の身
+                    ctx.fillRect(10, -2, 60, 5); 
+                    ctx.strokeStyle = "#999"; ctx.strokeRect(10, -2, 60, 5);
+                    ctx.fillStyle = "#333"; // 柄
+                    ctx.fillRect(0, -3, 15, 7);
+                    ctx.restore();
+                    
+                    ctx.beginPath();
+                    ctx.strokeStyle = "rgba(255,255,255,"+(en.swordGlint/45)+")";
+                    ctx.lineWidth = 6;
+                    ctx.arc(0, 0, 55, 0, Math.PI*2);
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                en.quotes = en.quotes.filter(q => {
+                    ctx.fillStyle = q.color; ctx.font = "bold 22px serif"; ctx.textAlign = "center";
+                    ctx.shadowColor = "white"; ctx.shadowBlur = 4;
+                    ctx.fillText(q.text, en.x, en.y - 65);
+                    ctx.shadowBlur = 0;
+                    q.timer--; return q.timer > 0;
+                });
+            });
+
+            projectiles.forEach(p => {
+                ctx.fillStyle = "#333"; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fill();
+            });
+
+            if (player.hp > 0) {
+                if (imgsReady >= 3) ctx.drawImage(playerImg, player.x-32, player.y-32, 64, 64);
+                else { ctx.fillStyle = "#00f"; ctx.fillRect(player.x-32, player.y-32, 64, 64); }
+            }
+
+            effects.forEach(e => drawLightning(e.x, e.y, e.type === 'YELLOW' ? '#ffd700' : '#00bfff'));
+            particles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); });
+            ctx.restore();
+
+            if (gameState === 'PLAYING' && joystick.active) {
+                ctx.beginPath(); ctx.arc(joystick.startX, joystick.startY, 40, 0, 7);
+                ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 2; ctx.stroke();
+            }
+        }
+
+        function drawLightning(x, y, color) {
+            ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x, y - 40);
+            for(let i=0; i<5; i++) ctx.lineTo(x + (Math.random()-0.5)*40, y - 40 + i*15);
+            ctx.stroke();
+        }
+
+        function handleAction(x, y) {
+            if (gameState !== 'PLAYING') return;
+            const worldX = x + camera.x, worldY = y + camera.y;
+            enemies.forEach(en => {
+                if (!en.alive) return;
+                if (Math.hypot(worldX - en.x, worldY - en.y) < 60 && Math.hypot(player.x - en.x, player.y - en.y) < 100) {
+                    en.alive = false;
+                    if (en.type === 'ICHINOSUKE') en.quotes.push({text: "無念ッ", timer: 90, color: "red"});
+                    effects.push({ x: en.x, y: en.y, type: 'YELLOW', timer: 120 });
+                    if (enemies.every(e => !e.alive)) {
+                        gameState = 'STAGE_CLEAR_WAIT';
+                        setTimeout(stageClearAction, 1000);
+                    }
+                }
+            });
+        }
+
+        function stageClearAction() {
+            showOverlay("STAGE CLEAR", 2000, () => {
+                if(currentStage < 4) initStage(currentStage + 1);
+                else { gameState = 'ENDING'; frameCount = 0; }
+            });
+        }
+
+        function updateParticlesOnly() {
+            frameCount++;
+            if (gameState === 'ENDING' && frameCount % 10 === 0 && frameCount < 250) {
+                const x = Math.random() * canvas.width + camera.x, y = Math.random() * canvas.height * 0.5 + camera.y;
+                const colors = ['#ff4757', '#2ed573', '#1e90ff', '#ffa502', '#ffffff'];
+                const color = colors[Math.floor(Math.random()*5)];
+                for(let i=0; i<60; i++) {
+                    const a = Math.random()*Math.PI*2, s = Math.random()*7+2;
+                    particles.push({x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, color, life: 90, size: Math.random()*5+2});
+                }
+            }
+            particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; if (p.life <= 0) particles.splice(i, 1); });
+            if (gameState === 'ENDING' && frameCount > 300) ui.end.style.display = 'block';
+            if (gameState === 'GAMEOVER' && frameCount > 300) ui.over.style.display = 'block';
+        }
+
+        canvas.addEventListener('touchstart', e => { const t = e.touches[0]; handleAction(t.clientX, t.clientY); joystick = { active: true, startX: t.clientX, startY: t.clientY, curX: t.clientX, curY: t.clientY }; });
+        canvas.addEventListener('touchmove', e => { if (joystick.active) { e.preventDefault(); joystick.curX = e.touches[0].clientX; joystick.curY = e.touches[0].clientY; } }, { passive: false });
+        canvas.addEventListener('touchend', () => joystick.active = false);
+        canvas.addEventListener('mousedown', e => { handleAction(e.clientX, e.clientY); joystick = { active: true, startX: e.clientX, startY: e.clientY, curX: e.clientX, curY: e.clientY }; });
+        canvas.addEventListener('mousemove', e => { if (joystick.active) { joystick.curX = e.clientX; joystick.curY = e.clientY; } });
+        window.addEventListener('mouseup', () => joystick.active = false);
+
+        loop();
+    </script>
+</body>
+</html>
