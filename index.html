@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>時代劇 ネコ忍者サバイバル Ver 1.19</title>
+    <title>時代劇 ネコ忍者サバイバル Ver 1.20</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Hiragino Mincho ProN', 'MS Mincho', serif; touch-action: none; }
         canvas { display: block; touch-action: none; background: #000; margin: 0 auto; }
@@ -12,7 +12,7 @@
         #title-screen, #gameover-screen, #end-screen { background: #000; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; color: #fff; position: absolute; top: 0; left: 0; z-index: 100; }
         #hp-display { position: absolute; top: 10px; left: 10px; font-size: 24px; color: #ff4757; pointer-events: none; font-weight: bold; font-family: sans-serif; z-index: 50; }
         /* Ver表示：中央・目立たないように */
-        .version-tag { position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%); font-size: 14px; color: #444; font-family: sans-serif; }
+        .version-tag { position: absolute; bottom: 35%; left: 50%; transform: translateX(-50%); font-size: 14px; color: #333; font-family: sans-serif; pointer-events: none; }
         #overlay-text { font-size: 60px; color: #fff; display: none; text-shadow: 2px 2px 4px #000; font-weight: bold; z-index: 80; }
     </style>
 </head>
@@ -26,7 +26,7 @@
             <p style="font-size: 18px; color: #aaa; margin-bottom: -10px; letter-spacing: 0.5em;">― 時代劇 ―</p>
             <h1 style="font-size: 46px; margin-bottom: 5px; border-top: 2px solid #fff; border-bottom: 2px solid #fff; padding: 15px 0;">ネコ忍者サバイバル</h1>
             <p style="font-size: 24px; color: #ff4757; margin-top: 20px;">[ タップして開始 ]</p>
-            <div class="version-tag">Ver 1.19</div>
+            <div class="version-tag">Ver 1.20</div>
         </div>
 
         <div id="gameover-screen" class="screen-text" style="display:none;" onclick="resetToTitle()">
@@ -55,7 +55,7 @@
         let camera = { x: 0, y: 0 };
         let frameCount = 0;
         let finalPhase = 0;
-        let groundPattern = null;
+        let groundPattern = null, wastelandPattern = null;
 
         const playerImg = new Image(); playerImg.src = 'player_cat_ninja.png';
         const enemyImg = new Image(); enemyImg.src = 'enemy_black_ninja.png';
@@ -67,28 +67,30 @@
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            // 宿場町の地面
             const gCanvas = document.createElement('canvas');
             gCanvas.width = 256; gCanvas.height = 256;
             const gCtx = gCanvas.getContext('2d');
             gCtx.fillStyle = "#a68b6a"; gCtx.fillRect(0,0,256,256);
-            for(let i=0; i<100; i++) {
-                gCtx.fillStyle = Math.random() > 0.5 ? "#947a5b" : "#b89c7a";
-                gCtx.beginPath(); gCtx.arc(Math.random()*256, Math.random()*256, Math.random()*2+1, 0, 7); gCtx.fill();
-            }
+            for(let i=0; i<100; i++) { gCtx.fillStyle = Math.random() > 0.5 ? "#947a5b" : "#b89c7a"; gCtx.beginPath(); gCtx.arc(Math.random()*256, Math.random()*256, Math.random()*2+1, 0, 7); gCtx.fill(); }
             groundPattern = ctx.createPattern(gCanvas, 'repeat');
+            // 荒地の地面
+            const wCanvas = document.createElement('canvas');
+            wCanvas.width = 256; wCanvas.height = 256;
+            const wCtx = wCanvas.getContext('2d');
+            wCtx.fillStyle = "#5d544b"; wCtx.fillRect(0,0,256,256);
+            for(let i=0; i<80; i++) { wCtx.fillStyle = Math.random() > 0.5 ? "#4a433a" : "#6e6459"; wCtx.beginPath(); wCtx.arc(Math.random()*256, Math.random()*256, Math.random()*4+2, 0, 7); wCtx.fill(); }
+            wastelandPattern = ctx.createPattern(wCanvas, 'repeat');
         }
 
         function initStage(num) {
-            currentStage = num;
-            finalPhase = 0;
+            currentStage = num; finalPhase = 0;
             player = { x: MAP_SIZE/2, y: MAP_SIZE/2 + 300, hp: 3, speed: 6 };
             enemies = []; projectiles = []; effects = []; particles = [];
-            
             if(num === 1) enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'SHINONOME'));
             else if(num === 2) spawnNinjas(2);
             else if(num === 3) spawnNinjas(3);
             else if(num === 4) spawnNinjas(5);
-
             updateHP(); updateCamera();
             gameState = 'STAGE_START';
             showOverlay(num === 4 ? "FINAL STAGE" : "STAGE "+num, 1500, () => gameState = 'PLAYING');
@@ -96,25 +98,16 @@
 
         function spawnNinjas(count, offset = 0) {
             const pos = [[0,-400], [400,0], [0,400], [-400,0], [-300,-300]];
-            for(let i=0; i<count; i++) {
-                const p = pos[(i + offset) % pos.length];
-                enemies.push(createEnemy(MAP_SIZE/2 + p[0], MAP_SIZE/2 + p[1], 'NINJA'));
-            }
+            for(let i=0; i<count; i++) { const p = pos[(i + offset) % pos.length]; enemies.push(createEnemy(MAP_SIZE/2 + p[0], MAP_SIZE/2 + p[1], 'NINJA')); }
         }
 
         function createEnemy(x, y, type) {
-            return { x, y, type, alive: true, hp: 1, moveStep: 0, pauseTimer: 0, attackPrep: 0, stunTimer: 0, rotation: 0, quotes: [], cooldown: 0, swordGlint: 0, readyTimer: 0, shuriken: { state: 'HELD' }, blurX: 0, blurY: 0, specialTimer: 0 };
+            return { x, y, type, alive: true, hp: 1, moveStep: 0, pauseTimer: 0, attackPrep: 0, stunTimer: 0, rotation: 0, quotes: [], cooldown: 0, swordGlint: 0, readyTimer: 0, shuriken: { state: 'HELD' }, blurX: 0, blurY: 0, specialTimer: 0, ghostMove: false };
         }
 
-        function updateHP() {
-            let hearts = ""; for(let i=0; i<player.hp; i++) hearts += "❤️";
-            ui.hp.innerHTML = "HP: " + (player.hp <= 0 ? "💀" : hearts);
-        }
-
+        function updateHP() { let hearts = ""; for(let i=0; i<player.hp; i++) hearts += "❤️"; ui.hp.innerHTML = "HP: " + (player.hp <= 0 ? "💀" : hearts); }
         function showOverlay(txt, dur, cb) { ui.overlay.style.display = 'block'; ui.overlay.innerHTML = txt; setTimeout(() => { ui.overlay.style.display = 'none'; if(cb) cb(); }, dur); }
-
         function startGame() { ui.title.style.display = 'none'; ui.hp.style.display = 'block'; initStage(1); }
-
         function resetToTitle() { gameState = 'TITLE'; ui.title.style.display = 'flex'; ui.end.style.display = 'none'; ui.over.style.display = 'none'; ui.hp.style.display = 'none'; }
 
         function update() {
@@ -133,36 +126,22 @@
             updateParticles();
         }
 
-        function updateCamera() {
-            camera.x = Math.max(0, Math.min(MAP_SIZE - canvas.width, player.x - canvas.width/2));
-            camera.y = Math.max(0, Math.min(MAP_SIZE - canvas.height, player.y - canvas.height/2));
-        }
+        function updateCamera() { camera.x = Math.max(0, Math.min(MAP_SIZE - canvas.width, player.x - canvas.width/2)); camera.y = Math.max(0, Math.min(MAP_SIZE - canvas.height, player.y - canvas.height/2)); }
 
         function updateEnemies() {
             enemies.forEach(en => {
                 if (!en.alive) return;
                 const d = Math.hypot(player.x - en.x, player.y - en.y);
-
                 if (en.type === 'NINJA') {
                     if (en.stunTimer > 0) { en.stunTimer--; if (en.stunTimer === 0) en.shuriken.state = 'HELD'; }
-                    else if (en.attackPrep > 0) {
-                        en.attackPrep--;
-                        if (en.attackPrep === 0) {
-                            const a = Math.atan2(player.y - en.y, player.x - en.x);
-                            projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 60, type: 'SHURIKEN', owner: en });
-                            en.shuriken.state = 'FLYING';
-                        }
-                    } else if (en.pauseTimer > 0) en.pauseTimer--;
+                    else if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { const a = Math.atan2(player.y - en.y, player.x - en.x); projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 60, type: 'SHURIKEN', owner: en }); en.shuriken.state = 'FLYING'; } }
+                    else if (en.pauseTimer > 0) en.pauseTimer--;
                     else {
-                        if (en.shuriken.state === 'HELD' && d < 300) { en.attackPrep = 60; }
+                        if (en.shuriken.state === 'HELD' && d < 300) en.attackPrep = 60;
                         else {
                             let tx = player.x, ty = player.y;
-                            if (en.shuriken.state === 'DROPPED') { 
-                                const s = projectiles.find(p => p.owner === en && p.type === 'SHURIKEN');
-                                if (s) { tx = s.x; ty = s.y; if (Math.hypot(en.x-tx, en.y-ty) < 20) { en.stunTimer = 120; en.shuriken.state = 'PICKUP'; return; } }
-                            }
-                            const a = Math.atan2(ty - en.y, tx - en.x);
-                            en.x += Math.cos(a)*3.5; en.y += Math.sin(a)*3.5; en.moveStep++;
+                            if (en.shuriken.state === 'DROPPED') { const s = projectiles.find(p => p.owner === en && p.type === 'SHURIKEN'); if (s) { tx = s.x; ty = s.y; if (Math.hypot(en.x-tx, en.y-ty) < 20) { en.stunTimer = 120; en.shuriken.state = 'PICKUP'; return; } } }
+                            const a = Math.atan2(ty - en.y, tx - en.x); en.x += Math.cos(a)*3.5; en.y += Math.sin(a)*3.5; en.moveStep++;
                             if (en.moveStep >= 30) { en.moveStep = 0; en.pauseTimer = 18; }
                         }
                     }
@@ -170,58 +149,26 @@
                     if (en.cooldown > 0) { en.cooldown--; if (en.cooldown === 0) { en.quotes.push({t: "装填ッ", l: 60, c: "blue"}); en.readyTimer = 60; } }
                     if (en.readyTimer > 0) en.readyTimer--;
                     if (en.pauseTimer > 0) en.pauseTimer--;
-                    else if (en.attackPrep > 0) {
-                        en.attackPrep--;
-                        if (en.attackPrep === 0) {
-                            if (en.swordGlint > 0) { if (d < 120) hitPlayer(3, true, en); en.swordGlint = 0; }
-                            else { 
-                                const a = Math.atan2(player.y - en.y, player.x - en.x);
-                                for(let i=-2; i<=2; i++) projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a+i*0.25)*7, vy: Math.sin(a+i*0.25)*7, life: 80, type: 'BULLET' });
-                                en.cooldown = 480;
-                            }
-                        }
-                    } else {
-                        if (d < 100) { en.attackPrep = 45; en.swordGlint = 45; }
-                        else if (en.cooldown === 0 && en.readyTimer === 0 && d < 500) { en.attackPrep = 60; en.quotes.push({t: "鉛玉くらえッ", l: 60, c: "black"}); }
-                        else {
-                            const a = Math.atan2(player.y - en.y, player.x - en.x);
-                            en.x += Math.cos(a)*2; en.y += Math.sin(a)*2; en.moveStep++;
-                            if (en.moveStep >= 40) { en.moveStep = 0; en.pauseTimer = 24; }
-                        }
-                    }
+                    else if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { if (en.swordGlint > 0) { if (d < 120) hitPlayer(3, true, en); en.swordGlint = 0; } else { const a = Math.atan2(player.y - en.y, player.x - en.x); for(let i=-2; i<=2; i++) projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a+i*0.25)*7, vy: Math.sin(a+i*0.25)*7, life: 80, type: 'BULLET' }); en.cooldown = 480; } } }
+                    else { if (d < 100) { en.attackPrep = 45; en.swordGlint = 45; } else if (en.cooldown === 0 && en.readyTimer === 0 && d < 500) { en.attackPrep = 60; en.quotes.push({t: "鉛玉くらえッ", l: 60, c: "black"}); } else { const a = Math.atan2(player.y - en.y, player.x - en.x); en.x += Math.cos(a)*2; en.y += Math.sin(a)*2; en.moveStep++; if (en.moveStep >= 40) { en.moveStep = 0; en.pauseTimer = 24; } } }
                 } else if (en.type === 'SHINONOME') {
                     en.blurX = 0; en.blurY = 0;
                     if (en.specialTimer > 0) {
                         en.specialTimer--;
-                        const a = Math.atan2(en.y - player.y, en.x - player.x);
-                        en.x += Math.cos(a) * 6; en.y += Math.sin(a) * 6; // ゆらゆら高速移動
-                        en.blurX = Math.sin(frameCount*0.5)*20; // 幽霊のブレ
-                        return;
+                        if (en.ghostMove) { const a = Math.atan2(en.y - player.y, en.x - player.x); en.x += Math.cos(a)*6.5; en.y += Math.sin(a)*6.5; en.blurX = Math.sin(frameCount*0.8)*25; }
+                        return; // 0.9s停止中
                     }
                     if (en.pauseTimer > 0) en.pauseTimer--;
-                    else if (en.attackPrep > 0) {
-                        en.attackPrep--;
-                        if (en.attackPrep === 0) {
-                            const a = Math.atan2(player.y - en.y, player.x - en.x);
-                            const type = en.lastAttackType || 'ICE_BREATH';
-                            projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: type === 'ICE_PILLAR' ? 100 : 60, type: type });
-                        }
-                    } else {
-                        // 10歩に1回超高速ブレ + 笑い
-                        if (en.moveStep >= 50 && en.moveStep % 10 === 0 && Math.random() < 0.3) {
-                            en.specialTimer = 40;
-                            en.quotes.push({t: "ウフフフ", l: 60, c: "white"});
+                    else if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { const a = Math.atan2(player.y - en.y, player.x - en.x); const type = en.lastAttackType || 'ICE_BREATH'; projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: type === 'ICE_PILLAR' ? 100 : 60, type: type }); } }
+                    else {
+                        // 10歩に1回「ウフフフ」 -> 0.9s停止 -> 幽霊移動
+                        if (en.moveStep >= 50 && en.moveStep % 10 === 0 && Math.random() < 0.4) {
+                            en.quotes.push({t: "ウフフフ", l: 80, c: "white"});
+                            en.specialTimer = 54; en.ghostMove = true; en.moveStep = 0;
                             return;
                         }
-                        if (d < 450 && Math.random() < 0.03) {
-                            en.attackPrep = 18;
-                            en.lastAttackType = d < 250 ? 'ICE_PILLAR' : 'ICE_BREATH';
-                        } else {
-                            const a = Math.atan2(player.y - en.y, player.x - en.x);
-                            en.x += Math.cos(a)*4.5; en.y += Math.sin(a)*4.5; en.moveStep++;
-                            if (en.moveStep % 10 === 0) { en.blurX = (Math.random()-0.5)*40; en.blurY = (Math.random()-0.5)*40; }
-                            if (en.moveStep >= 50) { en.moveStep = 0; en.pauseTimer = 24; }
-                        }
+                        if (d < 450 && Math.random() < 0.03) { en.attackPrep = 18; en.lastAttackType = d < 250 ? 'ICE_PILLAR' : 'ICE_BREATH'; }
+                        else { const a = Math.atan2(player.y - en.y, player.x - en.x); en.x += Math.cos(a)*4.5; en.y += Math.sin(a)*4.5; en.moveStep++; en.blurX = (Math.random()-0.5)*10; if (en.moveStep >= 50) { en.moveStep = 0; en.pauseTimer = 18; } }
                     }
                 }
             });
@@ -232,8 +179,8 @@
                 p.x += p.vx; p.y += p.vy; p.life--;
                 if (p.life > 0) {
                     const dist = Math.hypot(player.x - p.x, player.y - p.y);
-                    if (p.type === 'ICE_BREATH') { if (dist < 60) hitPlayer(1); } // 範囲内全て判定
-                    else if (p.type === 'ICE_PILLAR') { if (dist < 32) hitPlayer(1); } // 範囲内全て判定
+                    if (p.type === 'ICE_BREATH') { if (dist < 60) hitPlayer(1); }
+                    else if (p.type === 'ICE_PILLAR') { if (dist < 32) hitPlayer(1); }
                     else if (dist < 20) { hitPlayer(1); p.life = 0; }
                 }
                 if (p.life <= 0 && p.type === 'SHURIKEN' && p.owner && p.owner.shuriken.state === 'FLYING') { p.owner.shuriken.state = 'DROPPED'; p.vx = 0; p.vy = 0; }
@@ -243,10 +190,7 @@
         function hitPlayer(dmg, isSword, attacker) {
             player.hp -= dmg; if (player.hp < 0) player.hp = 0; updateHP();
             spawnBlood(player.x, player.y, player.hp <= 0 ? 100 : 20);
-            if (player.hp <= 0) { 
-                if (isSword && attacker) attacker.quotes.push({t: "フハハハハ", l: 120, c: "black"}); 
-                ui.over.style.display = 'flex'; gameState = 'GAMEOVER'; 
-            }
+            if (player.hp <= 0) { if (isSword && attacker) attacker.quotes.push({t: "フハハハハ", l: 120, c: "black"}); ui.over.style.display = 'flex'; gameState = 'GAMEOVER'; }
         }
 
         function spawnBlood(x, y, count) { for(let i=0; i<count; i++) { const a = Math.random()*7, s = Math.random()*8; particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, c: "red", l: 40, s: Math.random()*4+2 }); } }
@@ -258,7 +202,7 @@
                 showOverlay("市之助、出現ッ！", 1500, () => {
                     const bos = createEnemy(MAP_SIZE/2, MAP_SIZE/2-400, 'ICHINOSUKE');
                     bos.quotes.push({t: "ネコ公、今度こそ地獄へ送ってやるッ", l: 120, c: "black"});
-                    enemies.push(bos); spawnNinjas(3, 2);
+                    enemies.push(bos); spawnNinjas(5, 0); // ターン2: 忍者5体
                 });
                 return;
             }
@@ -266,10 +210,7 @@
             else if (currentStage < 4 && enemies.every(en => !en.alive)) triggerClear();
         }
 
-        function triggerClear() {
-            gameState = 'STAGE_CLEAR_WAIT';
-            setTimeout(() => { showOverlay("STAGE CLEAR", 2000, () => { if(currentStage < 4) initStage(currentStage+1); else { ui.end.style.display = 'flex'; gameState = 'ENDING'; frameCount = 0; } }); }, 1000);
-        }
+        function triggerClear() { gameState = 'STAGE_CLEAR_WAIT'; setTimeout(() => { showOverlay("STAGE CLEAR", 2000, () => { if(currentStage < 4) initStage(currentStage+1); else { ui.end.style.display = 'flex'; gameState = 'ENDING'; frameCount = 0; } }); }, 1000); }
 
         function updateParticles() {
             frameCount++;
@@ -283,28 +224,25 @@
         function draw() {
             ctx.clearRect(0,0,canvas.width,canvas.height);
             if (gameState === 'TITLE' || gameState === 'GAMEOVER' || gameState === 'ENDING') return;
-            ctx.fillStyle = groundPattern; ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = (currentStage === 4) ? wastelandPattern : groundPattern;
+            ctx.fillRect(0,0,canvas.width,canvas.height);
             ctx.save(); ctx.translate(-camera.x, -camera.y);
             ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.strokeRect(0,0,MAP_SIZE,MAP_SIZE);
 
             enemies.forEach(en => {
-                if (en.type === 'NINJA' && en.shuriken.state === 'DROPPED') { 
-                    const s = projectiles.find(p => p.owner === en && p.type === 'SHURIKEN'); 
-                    if(s) { ctx.fillStyle = "#777"; ctx.fillRect(s.x-15, s.y-2, 30, 4); ctx.fillRect(s.x-2, s.y-15, 4, 30); } 
-                }
+                if (en.type === 'NINJA' && en.shuriken.state === 'DROPPED') { const s = projectiles.find(p => p.owner === en && p.type === 'SHURIKEN'); if(s) { ctx.fillStyle = "#777"; ctx.fillRect(s.x-15, s.y-2, 30, 4); ctx.fillRect(s.x-2, s.y-15, 4, 30); } }
                 ctx.save(); ctx.translate(en.x + en.blurX, en.y + en.blurY);
                 if (!en.alive) ctx.rotate(Math.PI/2);
                 let img = en.type === 'NINJA' ? enemyImg : (en.type === 'ICHINOSUKE' ? yojimboImg : shinonomeImg);
                 if (imgsReady >= 4) ctx.drawImage(img, -32, -32, 64, 64);
                 else { ctx.fillStyle = en.type==='NINJA'?"#000":"#444"; ctx.fillRect(-20, -20, 40, 40); }
-                
                 if (en.alive) {
                     if (en.type === 'NINJA' && en.attackPrep > 0) { ctx.strokeStyle = "#00bfff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-20,-20); ctx.lineTo(20,20); ctx.moveTo(20,-20); ctx.lineTo(-20,20); ctx.stroke(); }
                     if (en.type === 'ICHINOSUKE' && en.swordGlint > 0) { ctx.save(); ctx.rotate(-Math.PI/4); ctx.fillStyle = "#eee"; ctx.fillRect(10,-2.5,60,5); ctx.restore(); ctx.strokeStyle = "white"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(0,0,55,0,7); ctx.stroke(); }
                     if (en.type === 'SHINONOME' && en.attackPrep > 0) { ctx.strokeStyle = "white"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0,0,60,0,7); ctx.stroke(); }
                 }
                 ctx.restore();
-                en.quotes = en.quotes.filter(q => { ctx.fillStyle = q.c; ctx.font = "bold 20px serif"; ctx.textAlign = "center"; ctx.fillText(q.t, en.x, en.y - 60); q.l--; return q.l > 0; });
+                en.quotes = en.quotes.filter(q => { ctx.fillStyle = q.c; ctx.font = "bold 20px serif"; ctx.textAlign = "center"; ctx.shadowColor = "white"; ctx.shadowBlur = 4; ctx.fillText(q.t, en.x, en.y - 60); ctx.shadowBlur = 0; q.l--; return q.l > 0; });
             });
 
             projectiles.forEach(p => { 
@@ -317,7 +255,7 @@
             effects = effects.filter(e => { ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(e.x, e.y-40); for(let i=0; i<5; i++) ctx.lineTo(e.x+(Math.random()-0.5)*40, e.y-40+i*15); ctx.stroke(); e.timer--; return e.timer > 0; });
             particles.forEach(p => { ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.s, p.s); });
             ctx.restore();
-            if (gameState === 'PLAYING' && joystick.active) { ctx.beginPath(); ctx.arc(joystick.startX, joystick.startY, 40, 0, 7); ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.stroke(); }
+            if (gameState === 'PLAYING' && joystick.active) { ctx.beginPath(); ctx.arc(joystick.startX, joystick.startY, 40, 0, 7); ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.stroke(); }
         }
 
         function handleAction(x, y) {
