@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>時代劇 ネコ忍者サバイバル Ver 1.40</title>
+    <title>時代劇 ネコ忍者サバイバル Ver 1.41</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Hiragino Mincho ProN', 'MS Mincho', serif; touch-action: none; }
         canvas { display: block; touch-action: none; background: #000; margin: 0 auto; }
@@ -51,7 +51,7 @@
             <p style="font-size: 20px; color: #aaa; margin-bottom: -10px; letter-spacing: 0.8em; font-weight: bold;">― 時代劇 ―</p>
             <h1 style="font-size: 48px; margin-bottom: 50px; border-top: 3px solid #fff; padding: 25px 0; letter-spacing: 0.1em; border-bottom: none;">ネコ忍者サバイバル</h1>
             <div class="ui-btn" style="width: 180px; font-size: 24px; background: #fff; color: #000; border: none;" onclick="startGame()">新規開始</div>
-            <div class="version-tag">Ver 1.40</div>
+            <div class="version-tag">Ver 1.41</div>
         </div>
 
         <div id="gameover-screen" class="screen-text" style="display:none;" onclick="resetToTitle()">
@@ -92,6 +92,7 @@
         const onigiriImg = new Image(); onigiriImg.src = 'onigiri.png';
         const obakeImg = new Image(); obakeImg.src = 'obake.png';
         const choutinImg = new Image(); choutinImg.src = 'choutinobake.png';
+        const tourouImg = new Image(); tourouImg.src = 'tourou.png';
 
         function resize() {
             canvas.width = window.innerWidth; canvas.height = window.innerHeight;
@@ -117,6 +118,8 @@
             if(num === 1) { 
                 enemies.push(createEnemy(MAP_SIZE/2 + (Math.random()-0.5)*400, MAP_SIZE/2 - 400, 'OBAKE', 0)); 
                 enemies.push(createEnemy(MAP_SIZE/2 + (Math.random()-0.5)*400, MAP_SIZE/2 - 200, 'CHOUTIN', 1)); 
+                objects.push({ x: player.x - 100, y: player.y, type: 'TOUROU' });
+                objects.push({ x: player.x + 100, y: player.y, type: 'TOUROU' });
             } else if(num === 2) { 
                 enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'NINJA', 0)); 
                 enemies.push(createEnemy(MAP_SIZE/2 + 400, MAP_SIZE/2, 'NINJA', 1)); 
@@ -145,7 +148,7 @@
             let hp = 1;
             if(type === 'OKYO' || type === 'CHOUTIN') hp = 3;
             if(type === 'ICHINOSUKE') hp = 5;
-            return { id, x, y, type, alive: true, hp, moveStep: 0, pauseTimer: 0, attackPrep: 0, stunTimer: 0, rotation: 0, quotes: [], cooldown: 0, swordGlint: 0, readyTimer: 0, shuriken: { state: 'HELD', myShuriken: null }, blurX: 0, blurY: 0, specialTimer: 0, teppoStep: 0, swayOffset: Math.random() * Math.PI * 2 };
+            return { id, x, y, type, alive: true, hp, moveStep: 0, pauseTimer: 0, attackPrep: 0, stunTimer: 0, rotation: 0, quotes: [], cooldown: 0, swordGlint: 0, readyTimer: 0, shuriken: { state: 'HELD', myShuriken: null }, blurX: 0, blurY: 0, specialTimer: 0, teppoStep: 0, swordReady: 0 };
         }
 
         function updateHP() { let hearts = ""; for(let i=0; i<player.hp; i++) hearts += "❤️"; ui.hp.innerHTML = "HP: " + (player.hp <= 0 ? "💀" : hearts); }
@@ -166,15 +169,7 @@
                 player.x = Math.max(32, Math.min(MAP_SIZE - 32, player.x));
                 player.y = Math.max(32, Math.min(MAP_SIZE - 32, player.y));
                 if (moving && frameCount % 8 === 0) addDust(player.x, player.y);
-                
-                items.forEach(it => {
-                    if (Math.abs(it.vx) > 0.1 || Math.abs(it.vy) > 0.1) {
-                        it.x += it.vx; it.y += it.vy;
-                        it.vx *= it.friction; it.vy *= it.friction;
-                        it.rotation += (Math.abs(it.vx) + Math.abs(it.vy)) * 0.1;
-                    } else { it.vx = 0; it.vy = 0; }
-                });
-
+                items.forEach(it => { if (Math.abs(it.vx) > 0.1 || Math.abs(it.vy) > 0.1) { it.x += it.vx; it.y += it.vy; it.vx *= it.friction; it.vy *= it.friction; it.rotation += (Math.abs(it.vx) + Math.abs(it.vy)) * 0.1; } else { it.vx = 0; it.vy = 0; } });
                 updateCamera(); updateEnemies(); updateProjectiles();
             }
             updateParticles();
@@ -198,39 +193,15 @@
 
         function updateObake(en, d) {
             if (en.pauseTimer > 0) { en.pauseTimer--; return; }
-            if (en.attackPrep > 0) {
-                en.attackPrep--;
-                if (en.attackPrep === 0) {
-                    const a = Math.atan2(player.y - en.y, player.x - en.x);
-                    projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 36, type: 'FIREBALL' });
-                    en.cooldown = 60;
-                }
-            } else {
-                if (d < 300 && en.cooldown <= 0) { en.attackPrep = 60; } 
-                else {
-                    approach(en, player.x, player.y, 2.5, 30, 18);
-                    en.x += Math.sin(frameCount * 0.1) * 2; // ゆらゆら
-                }
-            }
+            if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { const a = Math.atan2(player.y - en.y, player.x - en.x); projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 36, type: 'FIREBALL' }); en.cooldown = 60; } }
+            else { if (d < 300 && en.cooldown <= 0) { en.attackPrep = 60; } else { approach(en, player.x, player.y, 2.5, 30, 18); en.x += Math.sin(frameCount * 0.1) * 2; } }
             if (en.cooldown > 0) en.cooldown--;
         }
 
         function updateChoutin(en, d) {
             if (en.pauseTimer > 0) { en.pauseTimer--; return; }
-            if (en.attackPrep > 0) {
-                en.attackPrep--;
-                if (en.attackPrep === 0) {
-                    const a = Math.atan2(player.y - en.y, player.x - en.x);
-                    projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 60, type: 'BLUE_FIRE', split: false });
-                    en.cooldown = 100;
-                }
-            } else {
-                if (d < 350 && en.cooldown <= 0) { en.attackPrep = 60; }
-                else {
-                    approach(en, player.x, player.y, 2.0, 36, 30);
-                    en.y += Math.sin(frameCount * 0.08) * 1.5; // ゆらゆら
-                }
-            }
+            if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { const a = Math.atan2(player.y - en.y, player.x - en.x); projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 60, type: 'BLUE_FIRE', isSplit: false }); en.cooldown = 100; } }
+            else { if (d < 350 && en.cooldown <= 0) { en.attackPrep = 60; } else { approach(en, player.x, player.y, 2.0, 36, 30); en.y += Math.sin(frameCount * 0.08) * 1.5; } }
             if (en.cooldown > 0) en.cooldown--;
         }
 
@@ -238,43 +209,14 @@
             if (en.cooldown > 0) { en.cooldown--; return; }
             if (en.pauseTimer > 0) { en.pauseTimer--; return; }
             if (en.attackPrep === 0 && d < 600) { en.attackPrep = 60; en.teppoStep = 1; }
-            else if (en.attackPrep > 0) {
-                en.attackPrep--;
-                if (en.attackPrep === 0) {
-                    const a = Math.atan2(player.y - en.y, player.x - en.x);
-                    projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*7, vy: Math.sin(a)*7, life: 150, type: 'BULLET' });
-                    if (en.teppoStep === 1) { en.pauseTimer = 30; en.teppoStep = 2; en.attackPrep = 1; }
-                    else { en.quotes.push({t: "弾切れだ", l: 120, c: "yellow"}); en.cooldown = 120; en.teppoStep = 0; }
-                }
-            }
+            else if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { const a = Math.atan2(player.y - en.y, player.x - en.x); projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*7, vy: Math.sin(a)*7, life: 150, type: 'BULLET' }); if (en.teppoStep === 1) { en.pauseTimer = 30; en.teppoStep = 2; en.attackPrep = 1; } else { en.quotes.push({t: "弾切れだ", l: 120, c: "yellow"}); en.cooldown = 120; en.teppoStep = 0; } } }
         }
 
         function updateNinja(en, d) {
             if (en.stunTimer > 0) { en.stunTimer--; if (en.stunTimer === 0) { en.shuriken.state = 'HELD'; const idx = projectiles.findIndex(p => p === en.shuriken.myShuriken); if(idx !== -1) projectiles.splice(idx, 1); en.shuriken.myShuriken = null; } }
             else if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { const a = Math.atan2(player.y - en.y, player.x - en.x); const sObj = { x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 36, type: 'SHURIKEN', ownerId: en.id }; projectiles.push(sObj); en.shuriken.myShuriken = sObj; en.shuriken.state = 'FLYING'; } }
             else if (en.pauseTimer > 0) en.pauseTimer--;
-            else {
-                if (en.shuriken.state === 'HELD') { if (d < 350) en.attackPrep = 60; else approach(en, player.x, player.y, 3.5, 30, 18); }
-                else if (en.shuriken.state === 'DROPPED') { const s = en.shuriken.myShuriken; if (s) { if (Math.hypot(en.x - s.x, en.y - s.y) < 25) { en.stunTimer = 120; en.shuriken.state = 'PICKUP'; return; } approach(en, s.x, s.y, 3.5, 30, 18); } else en.shuriken.state = 'HELD'; }
-            }
-        }
-
-        function updateOkyo(en, d) {
-            if (en.cooldown > 0) { en.cooldown--; if (en.cooldown === 0) { en.quotes.push({t: "お色気よ", l: 60, c: "#ff69b4"}); en.readyTimer = 60; } }
-            if (en.readyTimer > 0) en.readyTimer--;
-            if (en.pauseTimer > 0) en.pauseTimer--;
-            else if (en.attackPrep > 0) {
-                en.attackPrep--;
-                if (en.attackPrep === 0) {
-                    const a = Math.atan2(player.y - en.y, player.x - en.x);
-                    projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 60, type: 'KISS', startLife: 60 });
-                    en.cooldown = 300; 
-                }
-            } else {
-                if (d < 65) { player.stunTimer = 180; en.pauseTimer = 30; } 
-                else if (en.cooldown === 0 && en.readyTimer === 0 && d < 400) { en.attackPrep = 40; en.quotes.push({t: "あら、いい男", l: 60, c: "#ff69b4"}); }
-                else approach(en, player.x, player.y, 3.0, 30, 30);
-            }
+            else { if (en.shuriken.state === 'HELD') { if (d < 350) en.attackPrep = 60; else approach(en, player.x, player.y, 3.5, 30, 18); } else if (en.shuriken.state === 'DROPPED') { const s = en.shuriken.myShuriken; if (s) { if (Math.hypot(en.x - s.x, en.y - s.y) < 25) { en.stunTimer = 120; en.shuriken.state = 'PICKUP'; return; } approach(en, s.x, s.y, 3.5, 30, 18); } else en.shuriken.state = 'HELD'; } }
         }
 
         function updateYojimbo(en, d) {
@@ -284,58 +226,52 @@
             else if (en.attackPrep > 0) {
                 en.attackPrep--;
                 if (en.attackPrep === 0) {
-                    if (en.swordGlint > 0) { if (d < 120) hitPlayer(3, true, en); en.swordGlint = 0; }
-                    else {
+                    if (en.swordGlint > 0) {
+                        en.swordReady = 18; // 0.3s (18frames at 60fps) 待機
+                        en.swordGlint = 0;
+                    } else {
                         const a = Math.atan2(player.y - en.y, player.x - en.x);
                         for(let i=-2; i<=2; i++) projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a+i*0.25)*7, vy: Math.sin(a+i*0.25)*7, life: 80, type: 'BULLET' });
                         en.cooldown = 480;
                     }
                 }
+            } else if (en.swordReady > 0) {
+                en.swordReady--;
+                if (en.swordReady === 0) { if (Math.hypot(player.x - en.x, player.y - en.y) < 120) hitPlayer(3, true, en); }
             } else {
-                if (d < 100) { en.attackPrep = 45; en.swordGlint = 45; }
+                if (d < 100) { en.attackPrep = 1; en.swordGlint = 1; } // 刀攻撃予兆開始
                 else if (en.cooldown === 0 && en.readyTimer === 0 && d < 500) { en.attackPrep = 60; en.quotes.push({t: "鉛玉くらえッ", l: 60, c: "black"}); }
                 else approach(en, player.x, player.y, 2.5, 40, 24);
             }
         }
 
-        function approach(en, tx, ty, spd, steps, pause) {
-            const a = Math.atan2(ty - en.y, tx - en.x);
-            en.x += Math.cos(a)*spd; en.y += Math.sin(a)*spd;
-            en.moveStep++; if (en.moveStep % steps === 0) en.pauseTimer = pause;
+        function updateOkyo(en, d) {
+            if (en.cooldown > 0) { en.cooldown--; if (en.cooldown === 0) { en.quotes.push({t: "お色気よ", l: 60, c: "#ff69b4"}); en.readyTimer = 60; } }
+            if (en.readyTimer > 0) en.readyTimer--;
+            if (en.pauseTimer > 0) en.pauseTimer--;
+            else if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { const a = Math.atan2(player.y - en.y, player.x - en.x); projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 60, type: 'KISS', startLife: 60 }); en.cooldown = 300; } }
+            else { if (d < 65) { player.stunTimer = 180; en.pauseTimer = 30; } else if (en.cooldown === 0 && en.readyTimer === 0 && d < 400) { en.attackPrep = 40; en.quotes.push({t: "あら、いい男", l: 60, c: "#ff69b4"}); } else approach(en, player.x, player.y, 3.0, 30, 30); }
         }
 
+        function approach(en, tx, ty, spd, steps, pause) { const a = Math.atan2(ty - en.y, tx - en.x); en.x += Math.cos(a)*spd; en.y += Math.sin(a)*spd; en.moveStep++; if (en.moveStep % steps === 0) en.pauseTimer = pause; }
+
         function updateProjectiles() {
-            projectiles.forEach((p, i) => {
+            projectiles.forEach((p) => {
                 if (p.life > 0) {
                     let moveX = p.vx, moveY = p.vy;
-                    if (p.type === 'KISS') {
-                        const offset = Math.sin((p.startLife - p.life) * 0.2) * 8;
-                        const perpA = Math.atan2(p.vy, p.vx) + Math.PI/2;
-                        moveX += Math.cos(perpA) * offset; moveY += Math.sin(perpA) * offset;
-                    }
+                    if (p.type === 'KISS') { const offset = Math.sin((p.startLife - p.life) * 0.2) * 8; const perpA = Math.atan2(p.vy, p.vx) + Math.PI/2; moveX += Math.cos(perpA) * offset; moveY += Math.sin(perpA) * offset; }
                     p.x += moveX; p.y += moveY; p.life--;
-                    
-                    // 分裂ロジック（ちょうちんおばけ）
-                    if (p.type === 'BLUE_FIRE' && p.life === 30 && !p.isSplit) {
-                        const a = Math.atan2(p.vy, p.vx);
-                        projectiles.push({ x: p.x, y: p.y, vx: Math.cos(a+0.5)*5, vy: Math.sin(a+0.5)*5, life: 30, type: 'BLUE_FIRE', isSplit: true });
-                        projectiles.push({ x: p.x, y: p.y, vx: Math.cos(a-0.5)*5, vy: Math.sin(a-0.5)*5, life: 30, type: 'BLUE_FIRE', isSplit: true });
-                        p.life = 0;
-                    }
-
+                    if (p.type === 'BLUE_FIRE' && p.life === 30 && !p.isSplit) { const a = Math.atan2(p.vy, p.vx); projectiles.push({ x: p.x, y: p.y, vx: Math.cos(a+0.5)*5, vy: Math.sin(a+0.5)*5, life: 30, type: 'BLUE_FIRE', isSplit: true }); projectiles.push({ x: p.x, y: p.y, vx: Math.cos(a-0.5)*5, vy: Math.sin(a-0.5)*5, life: 30, type: 'BLUE_FIRE', isSplit: true }); p.life = 0; }
                     const dist = Math.hypot(player.x - p.x, player.y - p.y);
                     if (dist < 30) { hitPlayer(1); p.life = 0; }
                 }
-                if (p.life <= 0 && p.type === 'SHURIKEN') {
-                    const owner = enemies.find(e => e.id === p.ownerId);
-                    if (owner && owner.shuriken.state === 'FLYING') { owner.shuriken.state = 'DROPPED'; p.vx = 0; p.vy = 0; }
-                }
+                if (p.life <= 0 && p.type === 'SHURIKEN') { const owner = enemies.find(e => e.id === p.ownerId); if (owner && owner.shuriken.state === 'FLYING') { owner.shuriken.state = 'DROPPED'; p.vx = 0; p.vy = 0; } }
             });
         }
 
         function hitPlayer(dmg, isSword, attacker) {
             if (dmg > 0) { player.hp -= dmg; if (player.hp < 0) player.hp = 0; updateHP(); spawnBlood(player.x, player.y, player.hp <= 0 ? 100 : 20); }
-            if (player.hp <= 0) { if (isSword && attacker) attacker.quotes.push({t: "フハハハハ", l: 120, c: "black"}); ui.over.style.display = 'flex'; ui.pauseContainer.style.display = 'none'; ui.stunMsg.style.display = 'none'; gameState = 'GAMEOVER'; }
+            if (player.hp <= 0) { if (isSword && attacker) attacker.quotes.push({t: "フハハハハァァァ", l: 120, c: "black"}); ui.over.style.display = 'flex'; ui.pauseContainer.style.display = 'none'; ui.stunMsg.style.display = 'none'; gameState = 'GAMEOVER'; }
         }
 
         function spawnBlood(x, y, count) { for(let i=0; i<count; i++){ const a = Math.random()*7, s = Math.random()*8; particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, c: "red", l: 40, s: Math.random()*4+2 }); } }
@@ -346,35 +282,26 @@
             if (currentStage === 5 && finalPhase === 1 && e.type === 'ICHINOSUKE') { triggerClear(); return; }
             if (currentStage === 5 && finalPhase === 0 && enemies.every(n => !n.alive)) {
                 finalPhase = 1; showOverlay("市之助、出現ッ！", 1500, () => { 
-                    const bos = createEnemy(MAP_SIZE/2, MAP_SIZE/2-400, 'ICHINOSUKE', 99); 
-                    bos.quotes.push({t: "地獄へ送ってやるッ", l: 120, c: "black"}); 
-                    enemies.push(bos); spawnNinjas(5, 100);
-                    enemies.push(createEnemy(MAP_SIZE/2 - 300, MAP_SIZE/2 - 200, 'TEPPO', 201));
-                    enemies.push(createEnemy(MAP_SIZE/2 + 300, MAP_SIZE/2 - 200, 'TEPPO', 202));
-                    objects.push({ x: MAP_SIZE/2 - 150, y: MAP_SIZE/2 + 500, type: 'JIZO', used: false });
-                    objects.push({ x: MAP_SIZE/2 + 150, y: MAP_SIZE/2 + 500, type: 'JIZO', used: false });
-                });
-                return;
+                    const bos = createEnemy(MAP_SIZE/2, MAP_SIZE/2-400, 'ICHINOSUKE', 99); enemies.push(bos); spawnNinjas(5, 100);
+                    enemies.push(createEnemy(MAP_SIZE/2 - 300, MAP_SIZE/2 - 200, 'TEPPO', 201)); enemies.push(createEnemy(MAP_SIZE/2 + 300, MAP_SIZE/2 - 200, 'TEPPO', 202));
+                    objects.push({ x: MAP_SIZE/2 - 150, y: MAP_SIZE/2 + 500, type: 'JIZO', used: false }); objects.push({ x: MAP_SIZE/2 + 150, y: MAP_SIZE/2 + 500, type: 'JIZO', used: false });
+                    objects.push({ x: player.x - 150, y: player.y + 100, type: 'TOUROU' }); objects.push({ x: player.x + 150, y: player.y + 100, type: 'TOUROU' });
+                }); return;
             }
             if (enemies.every(en => !en.alive)) triggerClear();
         }
 
         function triggerClear() { gameState = 'STAGE_CLEAR_WAIT'; ui.pauseContainer.style.display = 'none'; setTimeout(() => { showOverlay("STAGE CLEAR", 2000, () => { if(currentStage < 5) initStage(currentStage+1); else startEnding(); }); }, 1000); }
-
         function startEnding() { gameState = 'ENDING'; endingPhase = 1; endingTimer = 0; ui.end.style.display = 'flex'; ui.endMain.style.display = 'block'; ui.endSub.style.display = 'none'; ui.endHint.style.display = 'none'; }
-        function updateEnding() {
-            endingTimer++; if (frameCount % 8 === 0) { const fx = Math.random() * canvas.width + camera.x, fy = Math.random() * canvas.height * 0.5 + camera.y; for(let i=0; i<30; i++) { const a = Math.random()*7, s = Math.random()*6+2; particles.push({ x: fx, y: fy, vx: Math.cos(a)*s, vy: Math.sin(a)*s, c: `hsl(${Math.random()*360},100%,50%)`, l: 60, s: Math.random()*5+2 }); } }
-            if (endingPhase === 1 && endingTimer > 300) { endingPhase = 2; endingTimer = 0; gameState = 'ENDING_PHASE2'; ui.endMain.style.display = 'none'; ui.endSub.style.display = 'block'; } 
-            else if (endingPhase === 2 && endingTimer > 300) { endingPhase = 3; ui.endHint.style.display = 'block'; }
-        }
+        function updateEnding() { endingTimer++; if (frameCount % 8 === 0) { const fx = Math.random() * canvas.width + camera.x, fy = Math.random() * canvas.height * 0.5 + camera.y; for(let i=0; i<30; i++) { const a = Math.random()*7, s = Math.random()*6+2; particles.push({ x: fx, y: fy, vx: Math.cos(a)*s, vy: Math.sin(a)*s, c: `hsl(${Math.random()*360},100%,50%)`, l: 60, s: Math.random()*5+2 }); } } if (endingPhase === 1 && endingTimer > 300) { endingPhase = 2; endingTimer = 0; gameState = 'ENDING_PHASE2'; ui.endMain.style.display = 'none'; ui.endSub.style.display = 'block'; } else if (endingPhase === 2 && endingTimer > 300) { endingPhase = 3; ui.endHint.style.display = 'block'; } }
         function onEndingClick() { if (endingPhase === 3) resetToTitle(); }
-
         function updateParticles() { if (isPaused) return; frameCount++; particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.l--; if (p.l <= 0) particles.splice(i, 1); }); }
 
-        function drawCharacter(img, x, y, size, type, alive) {
+        function drawCharacter(img, x, y, size, type, alive, glint = false) {
             ctx.save(); ctx.translate(x, y); if (!alive) ctx.rotate(Math.PI/2);
             if (img.complete && img.naturalWidth !== 0) { ctx.drawImage(img, -size/2, -size/2, size, size); } 
             else { ctx.fillStyle = (type==='PLAYER')?"blue":"gray"; ctx.fillRect(-size/2, -size/2, size, size); }
+            if (glint) { ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.beginPath(); ctx.arc(0,0,size/2,0,7); ctx.fill(); }
             ctx.restore();
         }
 
@@ -383,32 +310,17 @@
             if (gameState === 'TITLE' || gameState === 'GAMEOVER' || gameState.includes('ENDING')) return;
             ctx.fillStyle = (currentStage === 5) ? wastelandPattern : groundPattern; ctx.fillRect(0,0,canvas.width,canvas.height);
             ctx.save(); ctx.translate(-camera.x, -camera.y);
-            
             projectiles.forEach(p => { if (p.type === 'SHURIKEN' && p.vx === 0) { ctx.fillStyle = "#777"; ctx.fillRect(p.x-15, p.y-2, 30, 4); ctx.fillRect(p.x-2, p.y-15, 4, 30); } });
             items.forEach(it => { ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rotation); if (onigiriImg.complete && onigiriImg.naturalWidth !== 0) ctx.drawImage(onigiriImg, -24, -24, 48, 48); ctx.restore(); });
-            objects.forEach(obj => drawCharacter(jizoImg, obj.x, obj.y, 64, 'JIZO', true));
-
+            objects.forEach(obj => { let img = obj.type === 'TOUROU' ? tourouImg : jizoImg; drawCharacter(img, obj.x, obj.y, 64, obj.type, true); });
             enemies.forEach(en => {
                 let size = (en.type==='OKYO') ? 128 : (en.type==='TEPPO'? 80 : 64);
                 let img = en.type === 'NINJA' ? enemyImg : (en.type === 'ICHINOSUKE' ? yojimboImg : (en.type === 'OKYO' ? okyoImg : (en.type === 'TEPPO' ? teppoImg : (en.type === 'OBAKE' ? obakeImg : (en.type==='CHOUTIN' ? choutinImg : shinonomeImg)))));
-                drawCharacter(img, en.x, en.y, size, en.type, en.alive);
-                
-                if (en.alive && en.attackPrep > 0) {
-                    ctx.strokeStyle = "#00bfff"; ctx.lineWidth = 2; ctx.beginPath();
-                    let lx = en.x, ly = en.y - 40; ctx.moveTo(lx, ly);
-                    for(let i=0; i<5; i++) { ctx.lineTo(lx + (Math.random()-0.5)*30, ly + i*15); } ctx.stroke();
-                }
+                drawCharacter(img, en.x, en.y, size, en.type, en.alive, en.swordGlint > 0 || en.swordReady > 0);
+                if (en.alive && en.attackPrep > 0 && en.type === 'NINJA') { ctx.strokeStyle = "#00bfff"; ctx.lineWidth = 2; ctx.beginPath(); let lx = en.x, ly = en.y - 40; ctx.moveTo(lx, ly); for(let i=0; i<5; i++) { ctx.lineTo(lx + (Math.random()-0.5)*30, ly + i*15); } ctx.stroke(); }
                 en.quotes = en.quotes.filter(q => { ctx.fillStyle = q.c; ctx.font = "bold 20px serif"; ctx.textAlign = "center"; ctx.fillText(q.t, en.x, en.y - size/2 - 10); q.l--; return q.l > 0; });
             });
-
-            projectiles.forEach(p => { 
-                if (p.life <= 0 && p.type !== 'SHURIKEN') return; if (p.vx === 0 && p.type === 'SHURIKEN') return;
-                if (p.type === 'FIREBALL') { ctx.fillStyle = "#ff4500"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fill(); }
-                else if (p.type === 'BLUE_FIRE') { ctx.fillStyle = "#00ffff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fill(); }
-                else if (p.type === 'KISS') { ctx.font = "30px serif"; ctx.fillText("💋", p.x-15, p.y+15); }
-                else { ctx.fillStyle = p.type==='SHURIKEN'?"#777":"#333"; if (p.type==='SHURIKEN') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(frameCount*0.5); ctx.fillRect(-12,-2,24,4); ctx.restore(); } else { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fill(); } } 
-            });
-
+            projectiles.forEach(p => { if (p.life <= 0 && p.type !== 'SHURIKEN') return; if (p.vx === 0 && p.type === 'SHURIKEN') return; if (p.type === 'FIREBALL') { ctx.fillStyle = "#ff4500"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fill(); } else if (p.type === 'BLUE_FIRE') { ctx.fillStyle = "#00ffff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fill(); } else if (p.type === 'KISS') { ctx.font = "30px serif"; ctx.fillText("💋", p.x-15, p.y+15); } else { ctx.fillStyle = p.type==='SHURIKEN'?"#777":"#333"; if (p.type==='SHURIKEN') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(frameCount*0.5); ctx.fillRect(-12,-2,24,4); ctx.restore(); } else { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fill(); } } });
             if (player.hp > 0) drawCharacter(playerImg, player.x, player.y, 64, 'PLAYER', true);
             effects = effects.filter(e => { ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(e.x, e.y-40); for(let i=0; i<5; i++) ctx.lineTo(e.x+(Math.random()-0.5)*40, e.y-40+i*15); ctx.stroke(); e.timer--; return e.timer > 0; });
             particles.forEach(p => { ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.s, p.s); });
@@ -421,15 +333,9 @@
             if (isPaused) return;
             const wx = x + camera.x, wy = y + camera.y;
             items.forEach((it, i) => { if (Math.hypot(wx - it.x, wy - it.y) < 40 && player.hp < 3) { player.hp++; updateHP(); items.splice(i, 1); } });
-            objects.forEach(obj => { if (Math.hypot(wx - obj.x, wy - obj.y) < 40 && !obj.used) { const angle = Math.random() * Math.PI * 2; items.push({ x: obj.x, y: obj.y, vx: Math.cos(angle)*6, vy: Math.sin(angle)*6, friction: 0.92, rotation: 0, type: 'ONIGIRI' }); obj.used = true; } });
+            objects.forEach(obj => { if (obj.type === 'JIZO' && Math.hypot(wx - obj.x, wy - obj.y) < 40 && !obj.used) { const angle = Math.random() * Math.PI * 2; items.push({ x: obj.x, y: obj.y, vx: Math.cos(angle)*6, vy: Math.sin(angle)*6, friction: 0.92, rotation: 0, type: 'ONIGIRI' }); obj.used = true; } });
             if (player.stunTimer > 0) return;
-            enemies.forEach(en => { 
-                let size = (en.type==='OKYO') ? 80 : 60;
-                if (en.alive && Math.hypot(wx - en.x, wy - en.y) < size && Math.hypot(player.x - en.x, player.y - en.y) < (size + 40)) { 
-                    en.hp--; effects.push({ x: en.x, y: en.y, timer: 60 }); 
-                    if (en.hp <= 0) { en.alive = false; if (en.type === 'OBAKE' || en.type === 'CHOUTIN') en.quotes.push({t: "ドロンッ", l: 90, c: "white"}); onEnemyDeath(en); } 
-                } 
-            });
+            enemies.forEach(en => { let size = (en.type==='OKYO') ? 80 : 60; if (en.alive && Math.hypot(wx - en.x, wy - en.y) < size && Math.hypot(player.x - en.x, player.y - en.y) < (size + 40)) { en.hp--; effects.push({ x: en.x, y: en.y, timer: 60 }); if (en.hp <= 0) { en.alive = false; if (en.type === 'OBAKE' || en.type === 'CHOUTIN') en.quotes.push({t: "ドロンッ", l: 90, c: "white"}); onEnemyDeath(en); } } });
         }
 
         resize(); window.addEventListener('resize', resize);
