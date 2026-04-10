@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>時代劇 ネコ忍者サバイバル Ver 1.39</title>
+    <title>時代劇 ネコ忍者サバイバル Ver 1.40</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Hiragino Mincho ProN', 'MS Mincho', serif; touch-action: none; }
         canvas { display: block; touch-action: none; background: #000; margin: 0 auto; }
@@ -51,7 +51,7 @@
             <p style="font-size: 20px; color: #aaa; margin-bottom: -10px; letter-spacing: 0.8em; font-weight: bold;">― 時代劇 ―</p>
             <h1 style="font-size: 48px; margin-bottom: 50px; border-top: 3px solid #fff; padding: 25px 0; letter-spacing: 0.1em; border-bottom: none;">ネコ忍者サバイバル</h1>
             <div class="ui-btn" style="width: 180px; font-size: 24px; background: #fff; color: #000; border: none;" onclick="startGame()">新規開始</div>
-            <div class="version-tag">Ver 1.39</div>
+            <div class="version-tag">Ver 1.40</div>
         </div>
 
         <div id="gameover-screen" class="screen-text" style="display:none;" onclick="resetToTitle()">
@@ -90,6 +90,8 @@
         const teppoImg = new Image(); teppoImg.src = '固定鉄砲隊.png';
         const jizoImg = new Image(); jizoImg.src = 'jizo.png';
         const onigiriImg = new Image(); onigiriImg.src = 'onigiri.png';
+        const obakeImg = new Image(); obakeImg.src = 'obake.png';
+        const choutinImg = new Image(); choutinImg.src = 'choutinobake.png';
 
         function resize() {
             canvas.width = window.innerWidth; canvas.height = window.innerHeight;
@@ -113,8 +115,8 @@
             enemies = []; projectiles = []; effects = []; particles = []; objects = []; items = [];
             
             if(num === 1) { 
-                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'OKYO', 0)); 
-                enemies.push(createEnemy(MAP_SIZE/2 + 200, MAP_SIZE/2 - 400, 'TEPPO', 1)); 
+                enemies.push(createEnemy(MAP_SIZE/2 + (Math.random()-0.5)*400, MAP_SIZE/2 - 400, 'OBAKE', 0)); 
+                enemies.push(createEnemy(MAP_SIZE/2 + (Math.random()-0.5)*400, MAP_SIZE/2 - 200, 'CHOUTIN', 1)); 
             } else if(num === 2) { 
                 enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'NINJA', 0)); 
                 enemies.push(createEnemy(MAP_SIZE/2 + 400, MAP_SIZE/2, 'NINJA', 1)); 
@@ -125,10 +127,13 @@
                 enemies.push(createEnemy(MAP_SIZE/2 - 400, MAP_SIZE/2, 'TEPPO', 3)); 
                 objects.push({ x: MAP_SIZE/2 - 550, y: MAP_SIZE/2, type: 'JIZO', used: false }); 
             } else if(num === 4) {
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'OKYO', 0)); 
+                enemies.push(createEnemy(MAP_SIZE/2 + 200, MAP_SIZE/2 - 400, 'TEPPO', 1)); 
+            } else if(num === 5) {
                 spawnNinjas(5);
             }
             updateHP(); updateCamera(); gameState = 'STAGE_START'; ui.pauseContainer.style.display = 'none';
-            showOverlay(num === 4 ? "FINAL STAGE" : "STAGE "+num, 1500, () => { gameState = 'PLAYING'; ui.pauseContainer.style.display = 'flex'; });
+            showOverlay(num === 5 ? "FINAL STAGE" : "STAGE "+num, 1500, () => { gameState = 'PLAYING'; ui.pauseContainer.style.display = 'flex'; });
         }
 
         function spawnNinjas(count, offsetId = 0) {
@@ -137,8 +142,10 @@
         }
 
         function createEnemy(x, y, type, id) {
-            let hp = (type === 'OKYO') ? 3 : (type === 'ICHINOSUKE' ? 5 : 1);
-            return { id, x, y, type, alive: true, hp, moveStep: 0, pauseTimer: 0, attackPrep: 0, stunTimer: 0, rotation: 0, quotes: [], cooldown: 0, swordGlint: 0, readyTimer: 0, shuriken: { state: 'HELD', myShuriken: null }, blurX: 0, blurY: 0, specialTimer: 0, teppoStep: 0 };
+            let hp = 1;
+            if(type === 'OKYO' || type === 'CHOUTIN') hp = 3;
+            if(type === 'ICHINOSUKE') hp = 5;
+            return { id, x, y, type, alive: true, hp, moveStep: 0, pauseTimer: 0, attackPrep: 0, stunTimer: 0, rotation: 0, quotes: [], cooldown: 0, swordGlint: 0, readyTimer: 0, shuriken: { state: 'HELD', myShuriken: null }, blurX: 0, blurY: 0, specialTimer: 0, teppoStep: 0, swayOffset: Math.random() * Math.PI * 2 };
         }
 
         function updateHP() { let hearts = ""; for(let i=0; i<player.hp; i++) hearts += "❤️"; ui.hp.innerHTML = "HP: " + (player.hp <= 0 ? "💀" : hearts); }
@@ -160,7 +167,6 @@
                 player.y = Math.max(32, Math.min(MAP_SIZE - 32, player.y));
                 if (moving && frameCount % 8 === 0) addDust(player.x, player.y);
                 
-                // おにぎりの物理
                 items.forEach(it => {
                     if (Math.abs(it.vx) > 0.1 || Math.abs(it.vy) > 0.1) {
                         it.x += it.vx; it.y += it.vy;
@@ -185,7 +191,47 @@
                 else if (en.type === 'ICHINOSUKE') updateYojimbo(en, d);
                 else if (en.type === 'OKYO') updateOkyo(en, d);
                 else if (en.type === 'TEPPO') updateTeppo(en, d);
+                else if (en.type === 'OBAKE') updateObake(en, d);
+                else if (en.type === 'CHOUTIN') updateChoutin(en, d);
             });
+        }
+
+        function updateObake(en, d) {
+            if (en.pauseTimer > 0) { en.pauseTimer--; return; }
+            if (en.attackPrep > 0) {
+                en.attackPrep--;
+                if (en.attackPrep === 0) {
+                    const a = Math.atan2(player.y - en.y, player.x - en.x);
+                    projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 36, type: 'FIREBALL' });
+                    en.cooldown = 60;
+                }
+            } else {
+                if (d < 300 && en.cooldown <= 0) { en.attackPrep = 60; } 
+                else {
+                    approach(en, player.x, player.y, 2.5, 30, 18);
+                    en.x += Math.sin(frameCount * 0.1) * 2; // ゆらゆら
+                }
+            }
+            if (en.cooldown > 0) en.cooldown--;
+        }
+
+        function updateChoutin(en, d) {
+            if (en.pauseTimer > 0) { en.pauseTimer--; return; }
+            if (en.attackPrep > 0) {
+                en.attackPrep--;
+                if (en.attackPrep === 0) {
+                    const a = Math.atan2(player.y - en.y, player.x - en.x);
+                    projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a)*5, vy: Math.sin(a)*5, life: 60, type: 'BLUE_FIRE', split: false });
+                    en.cooldown = 100;
+                }
+            } else {
+                if (d < 350 && en.cooldown <= 0) { en.attackPrep = 60; }
+                else {
+                    approach(en, player.x, player.y, 2.0, 36, 30);
+                    en.y += Math.sin(frameCount * 0.08) * 1.5; // ゆらゆら
+                }
+            }
+            if (en.cooldown > 0) en.cooldown--;
         }
 
         function updateTeppo(en, d) {
@@ -259,7 +305,7 @@
         }
 
         function updateProjectiles() {
-            projectiles.forEach((p) => {
+            projectiles.forEach((p, i) => {
                 if (p.life > 0) {
                     let moveX = p.vx, moveY = p.vy;
                     if (p.type === 'KISS') {
@@ -268,9 +314,17 @@
                         moveX += Math.cos(perpA) * offset; moveY += Math.sin(perpA) * offset;
                     }
                     p.x += moveX; p.y += moveY; p.life--;
+                    
+                    // 分裂ロジック（ちょうちんおばけ）
+                    if (p.type === 'BLUE_FIRE' && p.life === 30 && !p.isSplit) {
+                        const a = Math.atan2(p.vy, p.vx);
+                        projectiles.push({ x: p.x, y: p.y, vx: Math.cos(a+0.5)*5, vy: Math.sin(a+0.5)*5, life: 30, type: 'BLUE_FIRE', isSplit: true });
+                        projectiles.push({ x: p.x, y: p.y, vx: Math.cos(a-0.5)*5, vy: Math.sin(a-0.5)*5, life: 30, type: 'BLUE_FIRE', isSplit: true });
+                        p.life = 0;
+                    }
+
                     const dist = Math.hypot(player.x - p.x, player.y - p.y);
-                    if (p.type === 'KISS') { if (dist < 40) { hitPlayer(1); p.life = 0; } }
-                    else if (dist < 25) { hitPlayer(1); p.life = 0; }
+                    if (dist < 30) { hitPlayer(1); p.life = 0; }
                 }
                 if (p.life <= 0 && p.type === 'SHURIKEN') {
                     const owner = enemies.find(e => e.id === p.ownerId);
@@ -289,15 +343,14 @@
 
         function onEnemyDeath(e) {
             const sIdx = projectiles.findIndex(p => p.ownerId === e.id); if(sIdx !== -1) projectiles.splice(sIdx, 1);
-            if (currentStage === 4 && finalPhase === 1 && e.type === 'ICHINOSUKE') { triggerClear(); return; }
-            if (currentStage === 4 && finalPhase === 0 && enemies.every(n => !n.alive)) {
+            if (currentStage === 5 && finalPhase === 1 && e.type === 'ICHINOSUKE') { triggerClear(); return; }
+            if (currentStage === 5 && finalPhase === 0 && enemies.every(n => !n.alive)) {
                 finalPhase = 1; showOverlay("市之助、出現ッ！", 1500, () => { 
                     const bos = createEnemy(MAP_SIZE/2, MAP_SIZE/2-400, 'ICHINOSUKE', 99); 
                     bos.quotes.push({t: "地獄へ送ってやるッ", l: 120, c: "black"}); 
                     enemies.push(bos); spawnNinjas(5, 100);
                     enemies.push(createEnemy(MAP_SIZE/2 - 300, MAP_SIZE/2 - 200, 'TEPPO', 201));
                     enemies.push(createEnemy(MAP_SIZE/2 + 300, MAP_SIZE/2 - 200, 'TEPPO', 202));
-                    // お地蔵さんを2体設置
                     objects.push({ x: MAP_SIZE/2 - 150, y: MAP_SIZE/2 + 500, type: 'JIZO', used: false });
                     objects.push({ x: MAP_SIZE/2 + 150, y: MAP_SIZE/2 + 500, type: 'JIZO', used: false });
                 });
@@ -306,7 +359,7 @@
             if (enemies.every(en => !en.alive)) triggerClear();
         }
 
-        function triggerClear() { gameState = 'STAGE_CLEAR_WAIT'; ui.pauseContainer.style.display = 'none'; setTimeout(() => { showOverlay("STAGE CLEAR", 2000, () => { if(currentStage < 4) initStage(currentStage+1); else startEnding(); }); }, 1000); }
+        function triggerClear() { gameState = 'STAGE_CLEAR_WAIT'; ui.pauseContainer.style.display = 'none'; setTimeout(() => { showOverlay("STAGE CLEAR", 2000, () => { if(currentStage < 5) initStage(currentStage+1); else startEnding(); }); }, 1000); }
 
         function startEnding() { gameState = 'ENDING'; endingPhase = 1; endingTimer = 0; ui.end.style.display = 'flex'; ui.endMain.style.display = 'block'; ui.endSub.style.display = 'none'; ui.endHint.style.display = 'none'; }
         function updateEnding() {
@@ -321,50 +374,38 @@
         function drawCharacter(img, x, y, size, type, alive) {
             ctx.save(); ctx.translate(x, y); if (!alive) ctx.rotate(Math.PI/2);
             if (img.complete && img.naturalWidth !== 0) { ctx.drawImage(img, -size/2, -size/2, size, size); } 
-            else { 
-                ctx.fillStyle = (type==='OKYO')?"purple":(type==='PLAYER')?"blue":(type==='TEPPO')?"darkgreen":(type==='JIZO')?"gray":"#222"; 
-                ctx.fillRect(-size/2, -size/2, size, size); 
-            }
+            else { ctx.fillStyle = (type==='PLAYER')?"blue":"gray"; ctx.fillRect(-size/2, -size/2, size, size); }
             ctx.restore();
         }
 
         function draw() {
             ctx.clearRect(0,0,canvas.width,canvas.height);
             if (gameState === 'TITLE' || gameState === 'GAMEOVER' || gameState.includes('ENDING')) return;
-            ctx.fillStyle = (currentStage === 4) ? wastelandPattern : groundPattern; ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = (currentStage === 5) ? wastelandPattern : groundPattern; ctx.fillRect(0,0,canvas.width,canvas.height);
             ctx.save(); ctx.translate(-camera.x, -camera.y);
             
             projectiles.forEach(p => { if (p.type === 'SHURIKEN' && p.vx === 0) { ctx.fillStyle = "#777"; ctx.fillRect(p.x-15, p.y-2, 30, 4); ctx.fillRect(p.x-2, p.y-15, 4, 30); } });
-            
-            items.forEach(it => { 
-                ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rotation);
-                if (onigiriImg.complete && onigiriImg.naturalWidth !== 0) ctx.drawImage(onigiriImg, -24, -24, 48, 48); 
-                else { ctx.fillStyle="white"; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(-20, 20); ctx.lineTo(20, 20); ctx.fill(); } 
-                ctx.restore();
-            });
-            
+            items.forEach(it => { ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rotation); if (onigiriImg.complete && onigiriImg.naturalWidth !== 0) ctx.drawImage(onigiriImg, -24, -24, 48, 48); ctx.restore(); });
             objects.forEach(obj => drawCharacter(jizoImg, obj.x, obj.y, 64, 'JIZO', true));
 
             enemies.forEach(en => {
                 let size = (en.type==='OKYO') ? 128 : (en.type==='TEPPO'? 80 : 64);
-                let img = en.type === 'NINJA' ? enemyImg : (en.type === 'ICHINOSUKE' ? yojimboImg : (en.type === 'OKYO' ? okyoImg : (en.type === 'TEPPO' ? teppoImg : shinonomeImg)));
+                let img = en.type === 'NINJA' ? enemyImg : (en.type === 'ICHINOSUKE' ? yojimboImg : (en.type === 'OKYO' ? okyoImg : (en.type === 'TEPPO' ? teppoImg : (en.type === 'OBAKE' ? obakeImg : (en.type==='CHOUTIN' ? choutinImg : shinonomeImg)))));
                 drawCharacter(img, en.x, en.y, size, en.type, en.alive);
                 
                 if (en.alive && en.attackPrep > 0) {
-                    if (en.type === 'NINJA') { 
-                        // 雷エフェクト
-                        ctx.strokeStyle = "#00bfff"; ctx.lineWidth = 2; ctx.beginPath();
-                        let lx = en.x, ly = en.y - 40; ctx.moveTo(lx, ly);
-                        for(let i=0; i<5; i++) { ctx.lineTo(lx + (Math.random()-0.5)*30, ly + i*15); } ctx.stroke();
-                    }
-                    if (en.type === 'TEPPO') { ctx.fillStyle = "rgba(255,0,0,0.3)"; ctx.beginPath(); ctx.arc(en.x, en.y, 40, 0, 7); ctx.fill(); }
+                    ctx.strokeStyle = "#00bfff"; ctx.lineWidth = 2; ctx.beginPath();
+                    let lx = en.x, ly = en.y - 40; ctx.moveTo(lx, ly);
+                    for(let i=0; i<5; i++) { ctx.lineTo(lx + (Math.random()-0.5)*30, ly + i*15); } ctx.stroke();
                 }
                 en.quotes = en.quotes.filter(q => { ctx.fillStyle = q.c; ctx.font = "bold 20px serif"; ctx.textAlign = "center"; ctx.fillText(q.t, en.x, en.y - size/2 - 10); q.l--; return q.l > 0; });
             });
 
             projectiles.forEach(p => { 
                 if (p.life <= 0 && p.type !== 'SHURIKEN') return; if (p.vx === 0 && p.type === 'SHURIKEN') return;
-                if (p.type === 'KISS') { ctx.font = "30px serif"; ctx.fillText("💋", p.x-15, p.y+15); }
+                if (p.type === 'FIREBALL') { ctx.fillStyle = "#ff4500"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fill(); }
+                else if (p.type === 'BLUE_FIRE') { ctx.fillStyle = "#00ffff"; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fill(); }
+                else if (p.type === 'KISS') { ctx.font = "30px serif"; ctx.fillText("💋", p.x-15, p.y+15); }
                 else { ctx.fillStyle = p.type==='SHURIKEN'?"#777":"#333"; if (p.type==='SHURIKEN') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(frameCount*0.5); ctx.fillRect(-12,-2,24,4); ctx.restore(); } else { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fill(); } } 
             });
 
@@ -379,28 +420,14 @@
         function handleAction(x, y) {
             if (isPaused) return;
             const wx = x + camera.x, wy = y + camera.y;
-
-            items.forEach((it, i) => {
-                if (Math.hypot(wx - it.x, wy - it.y) < 40) {
-                    if (player.hp < 3) { player.hp++; updateHP(); items.splice(i, 1); }
-                }
-            });
-
-            objects.forEach(obj => {
-                if (Math.hypot(wx - obj.x, wy - obj.y) < 40 && !obj.used) {
-                    // おにぎりを飛ばす（転がる演出）
-                    const angle = Math.random() * Math.PI * 2;
-                    items.push({ x: obj.x, y: obj.y, vx: Math.cos(angle)*6, vy: Math.sin(angle)*6, friction: 0.92, rotation: 0, type: 'ONIGIRI' });
-                    obj.used = true;
-                }
-            });
-
+            items.forEach((it, i) => { if (Math.hypot(wx - it.x, wy - it.y) < 40 && player.hp < 3) { player.hp++; updateHP(); items.splice(i, 1); } });
+            objects.forEach(obj => { if (Math.hypot(wx - obj.x, wy - obj.y) < 40 && !obj.used) { const angle = Math.random() * Math.PI * 2; items.push({ x: obj.x, y: obj.y, vx: Math.cos(angle)*6, vy: Math.sin(angle)*6, friction: 0.92, rotation: 0, type: 'ONIGIRI' }); obj.used = true; } });
             if (player.stunTimer > 0) return;
             enemies.forEach(en => { 
                 let size = (en.type==='OKYO') ? 80 : 60;
                 if (en.alive && Math.hypot(wx - en.x, wy - en.y) < size && Math.hypot(player.x - en.x, player.y - en.y) < (size + 40)) { 
                     en.hp--; effects.push({ x: en.x, y: en.y, timer: 60 }); 
-                    if (en.hp <= 0) { en.alive = false; if (en.type === 'TEPPO') en.quotes.push({t: "おのれ", l: 90, c: "red"}); if (en.type === 'OKYO') en.quotes.push({t: "このねこでなし", l: 120, c: "#ff69b4"}); onEnemyDeath(en); } 
+                    if (en.hp <= 0) { en.alive = false; if (en.type === 'OBAKE' || en.type === 'CHOUTIN') en.quotes.push({t: "ドロンッ", l: 90, c: "white"}); onEnemyDeath(en); } 
                 } 
             });
         }
