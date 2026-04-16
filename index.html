@@ -3,23 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>時代劇 ネコ忍者サバイバル Ver 1.49</title>
+    <title>時代劇 ネコ忍者サバイバル Ver 1.50</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Hiragino Mincho ProN', 'MS Mincho', serif; touch-action: none; }
         canvas { display: block; touch-action: none; background: #000; margin: 0 auto; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .screen-text { text-align: center; pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 100; color: #fff; background: #000; }
+        
         .version-tag { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 14px; color: #fff; font-family: sans-serif; pointer-events: none; opacity: 0.7; }
         #hp-display { position: absolute; top: 10px; left: 10px; font-size: 24px; color: #ff4757; pointer-events: none; font-weight: bold; font-family: sans-serif; z-index: 50; }
-        .ui-btn { padding: 12px 24px; background: rgba(255,255,255,0.2); color: #fff; border: 2px solid #fff; pointer-events: auto; cursor: pointer; font-weight: bold; z-index: 110; font-family: sans-serif; border-radius: 4px; margin: 5px; }
+        
+        .ui-btn { padding: 12px 24px; background: rgba(255,255,255,0.2); color: #fff; border: 2px solid #fff; pointer-events: auto; cursor: pointer; font-weight: bold; z-index: 110; font-family: sans-serif; border-radius: 4px; margin: 10px; }
         .ui-btn:hover { background: rgba(255,255,255,0.4); }
+        
         #pause-container { position: absolute; top: 10px; right: 10px; display: flex; gap: 10px; pointer-events: none; z-index: 110; }
         #pause-container .ui-btn { pointer-events: auto; }
+        
         #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; z-index: 70; pointer-events: none; }
         #pause-text { position: absolute; top: 25%; left: 50%; transform: translateX(-50%); font-size: 44px; color: #fff; font-weight: bold; animation: blink 0.8s infinite; text-align: center; width: 100%; }
+        
         #confirm-dialog { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); display: none; flex-direction: column; align-items: center; gap: 20px; z-index: 200; pointer-events: auto; background: rgba(20,20,20,0.95); padding: 30px 50px; border: 2px solid #fff; border-radius: 10px; }
-        #result-screen { display: none; background: #000; z-index: 150; pointer-events: auto; }
+
+        /* エンディング・リザルト専用レイアウト */
+        #ending-screen, #result-screen, #secret-screen { display: none; background: #000; z-index: 150; pointer-events: auto; }
         .result-box { background: rgba(255,255,255,0.1); padding: 30px; border-radius: 10px; min-width: 320px; text-align: left; margin-bottom: 20px; font-size: 18px; line-height: 2; border: 1px solid #444; }
+
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.1; } 100% { opacity: 1; } }
         #overlay-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; color: #fff; display: none; text-shadow: 2px 2px 4px #000; font-weight: bold; z-index: 80; pointer-events: none; }
         #stun-msg { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); color: #ff69b4; font-size: 28px; font-weight: bold; text-shadow: 2px 2px 0 #000; display: none; z-index: 45; pointer-events: none; animation: blink 0.5s infinite; }
@@ -40,7 +48,7 @@
         <div id="pause-overlay"><div id="pause-text">一時休息</div></div>
 
         <div id="confirm-dialog">
-            <p style="color:white; font-size:24px; margin:0 0 10px 0; font-weight: bold;">タイトル画面に戻る</p>
+            <p style="color:white; font-size:24px; margin:0 0 20px 0; font-weight: bold;">タイトル画面に戻る</p>
             <div style="display:flex; gap:30px;">
                 <div class="ui-btn" onclick="resetToTitle()">はい</div>
                 <div class="ui-btn" onclick="hideExitConfirm()">いいえ</div>
@@ -54,7 +62,7 @@
             <h1 style="font-size: 48px; margin-bottom: 50px; border-top: 3px solid #fff; padding: 25px 0; letter-spacing: 0.1em;">ネコ忍者サバイバル</h1>
             <div class="ui-btn" style="width: 200px; font-size: 24px; background: #fff; color: #000; border: none;" onclick="startGame()">新規開始</div>
             <div class="ui-btn" style="width: 200px; font-size: 20px;" onclick="openAchievements()">実績</div>
-            <div class="version-tag">Ver 1.49</div>
+            <div class="version-tag">Ver 1.50</div>
         </div>
 
         <div id="gameover-screen" class="screen-text" style="display:none;" onclick="resetToTitle()">
@@ -62,19 +70,24 @@
             <p style="font-size: 20px; color: #ff4757;">タップしてタイトルへ</p>
         </div>
 
-        <div id="end-screen" class="screen-text" style="display:none;" onclick="onEndingClick()">
-            <h1 id="end-main-text" style="font-size: 80px; letter-spacing: 0.2em;">終劇</h1>
-            <p id="end-sub-text" style="font-size: 24px; display: none;">プレイしていただきありがとうございます</p>
-            <p id="end-return-hint" style="font-size: 18px; color: #888; margin-top: 40px; display:none;">タップして戦績を表示</p>
+        <div id="ending-screen" class="screen-text" onclick="onEndingClick()">
+            <h1 id="end-text-main" style="font-size: 80px; letter-spacing: 0.2em;">終劇</h1>
+            <p id="end-text-sub" style="font-size: 24px; display:none;">プレイしていただきありがとうございます</p>
+            <p id="end-tap-hint" style="font-size: 18px; color: #888; margin-top: 40px; display:none;">画面をタップ</p>
         </div>
 
-        <div id="result-screen" class="screen-text" onclick="showResultMenu()">
+        <div id="result-screen" class="screen-text" onclick="showSecretMessage()">
             <h1 style="margin-bottom: 20px;">戦績報告</h1>
             <div class="result-box" id="result-content"></div>
-            <p id="result-tap-hint" style="font-size: 16px; color: #aaa;">画面をタップして次へ</p>
-            <div id="result-menu" style="display:none; margin-top:20px;">
-                <div class="ui-btn" style="background:#fff; color:#000; font-size: 24px;" onclick="resetToTitle()">タイトル画面に戻る</div>
+            <p style="font-size: 16px; color: #aaa;">タップして次へ</p>
+        </div>
+
+        <div id="secret-screen" class="screen-text">
+            <div id="secret-msg-box" style="margin-bottom: 40px;" onclick="showFinalReturnBtn()">
+                <h2 style="font-size: 32px;">妖狐エンディング<br>見つけられましたか</h2>
+                <p style="font-size: 16px; color: #888; margin-top: 20px;">タップして進む</p>
             </div>
+            <div id="final-return-btn" class="ui-btn" style="display:none; font-size: 24px; background: #fff; color: #000;" onclick="resetToTitle()">タイトル画面に戻る</div>
         </div>
     </div>
 
@@ -83,7 +96,7 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const ui = { title: document.getElementById('title-screen'), end: document.getElementById('end-screen'), endMain: document.getElementById('end-main-text'), endSub: document.getElementById('end-sub-text'), endHint: document.getElementById('end-return-hint'), over: document.getElementById('gameover-screen'), hp: document.getElementById('hp-display'), overlay: document.getElementById('overlay-text'), pauseContainer: document.getElementById('pause-container'), pauseOverlay: document.getElementById('pause-overlay'), confirmDialog: document.getElementById('confirm-dialog'), stunMsg: document.getElementById('stun-msg'), result: document.getElementById('result-screen'), resultTxt: document.getElementById('result-content'), resultMenu: document.getElementById('result-menu'), resultHint: document.getElementById('result-tap-hint') };
+        const ui = { title: document.getElementById('title-screen'), ending: document.getElementById('ending-screen'), endMain: document.getElementById('end-text-main'), endSub: document.getElementById('end-text-sub'), endHint: document.getElementById('end-tap-hint'), over: document.getElementById('gameover-screen'), hp: document.getElementById('hp-display'), overlay: document.getElementById('overlay-text'), pauseContainer: document.getElementById('pause-container'), pauseOverlay: document.getElementById('pause-overlay'), confirmDialog: document.getElementById('confirm-dialog'), stunMsg: document.getElementById('stun-msg'), result: document.getElementById('result-screen'), resultTxt: document.getElementById('result-content'), secret: document.getElementById('secret-screen'), finalReturn: document.getElementById('final-return-btn') };
 
         const MAP_SIZE = 1500;
         let gameState = 'TITLE', isPaused = false, currentStage = 1;
@@ -156,11 +169,11 @@
                 enemies.push(createEnemy(MAP_SIZE/2 + (Math.random()-0.5)*400, MAP_SIZE/2 - 400, 'OBAKE', 0)); 
                 enemies.push(createEnemy(MAP_SIZE/2 + (Math.random()-0.5)*400, MAP_SIZE/2 - 200, 'CHOUTIN', 1)); 
             } else if(num === 6) {
-                enemies.push(createEnemy(MAP_SIZE/2, 200, 'BUNSHIN_MAIN', 10)); // 北
-                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE - 200, 'BUNSHIN_MAIN', 11)); // 南
+                enemies.push(createEnemy(MAP_SIZE/2, 200, 'BUNSHIN_MAIN', 10));
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE - 200, 'BUNSHIN_MAIN', 11));
                 for(let i=0; i<6; i++) enemies.push(createEnemy(Math.random()*(MAP_SIZE-200)+100, Math.random()*(MAP_SIZE-200)+100, 'NINJA', 20+i));
                 for(let i=0; i<30; i++) objects.push({ x: Math.random()*(MAP_SIZE-200)+100, y: Math.random()*(MAP_SIZE-200)+100, type: 'TOUROU_HIRU' });
-                objects.push({ x: 100, y: MAP_SIZE - 100, type: 'JIZO', used: false }); // 南西にお地蔵さん
+                objects.push({ x: 100, y: MAP_SIZE - 100, type: 'JIZO', used: false }); 
             } else if(num === 7) {
                 spawnNinjas(5);
                 if((stats.kills.GREY_NINJA || 0) >= 10) objects.push({ x: MAP_SIZE - 200, y: 200, type: 'NINJA_YASHIKI' });
@@ -182,7 +195,7 @@
         function updateHP() { let hearts = ""; for(let i=0; i<player.hp; i++) hearts += "❤️"; ui.hp.innerHTML = "HP: " + (player.hp <= 0 ? "💀" : hearts); }
         function showOverlay(txt, dur, cb) { ui.overlay.style.display = 'block'; ui.overlay.innerHTML = txt; setTimeout(() => { ui.overlay.style.display = 'none'; if(cb) cb(); }, dur); }
         function startGame() { stats = { kills: {}, damageTaken: 0, itemsUsed: 0 }; ui.title.style.display = 'none'; ui.hp.style.display = 'block'; initStage(1); }
-        function resetToTitle() { gameState = 'TITLE'; isPaused = false; ui.title.style.display = 'flex'; ui.end.style.display = 'none'; ui.over.style.display = 'none'; ui.hp.style.display = 'none'; ui.pauseContainer.style.display = 'none'; ui.pauseOverlay.style.display = 'none'; ui.confirmDialog.style.display = 'none'; ui.stunMsg.style.display = 'none'; ui.result.style.display = 'none'; }
+        function resetToTitle() { gameState = 'TITLE'; isPaused = false; ui.title.style.display = 'flex'; ui.ending.style.display = 'none'; ui.over.style.display = 'none'; ui.hp.style.display = 'none'; ui.pauseContainer.style.display = 'none'; ui.pauseOverlay.style.display = 'none'; ui.confirmDialog.style.display = 'none'; ui.stunMsg.style.display = 'none'; ui.result.style.display = 'none'; ui.secret.style.display = 'none'; }
 
         function update() {
             if (isPaused) return;
@@ -205,14 +218,14 @@
                 updateCamera(); updateEnemies(); updateProjectiles();
             }
             updateParticles();
-            if (gameState.includes('ENDING')) updateEnding();
+            if (gameState.includes('ENDING')) updateEndingLogic();
         }
 
         function triggerMansionRoute() {
             finalPhase = 2; enemies = []; projectiles = [];
             showOverlay("忍者屋敷 突入ッ！", 1500, () => {
                 for(let i=0; i<20; i++) enemies.push(createEnemy(Math.random()*(MAP_SIZE-200)+100, Math.random()*(MAP_SIZE-200)+100, 'NINJA', 300+i));
-                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2, 'YOUKO', 999)); // 屋敷ボスは妖狐
+                enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2, 'YOUKO', 999));
             });
         }
 
@@ -244,7 +257,7 @@
                     const rotY = relX * Math.sin(-a) + relY * Math.cos(-a);
                     if (rotX > 0 && rotX < 128 && Math.abs(rotY) < 32) hitPlayer(1);
                     en.quotes.push({t: "目がまわるぅ", l: 60, c: "yellow"});
-                    en.pauseTimer = 60; en.readyTimer = 60; // 360度回転フラグ
+                    en.pauseTimer = 60; en.readyTimer = 60; 
                 }
                 return;
             }
@@ -257,12 +270,12 @@
                 }
                 return;
             }
-            if (d < 100) { en.swordReady = 12; en.pauseTimer = 12; } // 近距離
-            else if (d < 450 && en.cooldown <= 0) { en.attackPrep = 18; } // 遠距離
+            if (d < 100) { en.swordReady = 12; en.pauseTimer = 12; } 
+            else if (d < 450 && en.cooldown <= 0) { en.attackPrep = 18; } 
             else {
                 approach(en, player.x, player.y, 4.0, 7, 0);
                 if (en.moveStep % 7 === 0) {
-                    if (Math.random() < 0.5) en.pauseTimer = 18; // 0.3s
+                    if (Math.random() < 0.5) en.pauseTimer = 18; 
                     else { en.x += Math.cos(Math.atan2(player.y-en.y, player.x-en.x))*80; en.blurX = 30; en.pauseTimer = 6; }
                 }
             }
@@ -276,7 +289,18 @@
             if (en.readyTimer > 0) en.readyTimer--;
             if (en.pauseTimer > 0) { en.pauseTimer--; return; }
             if (en.swordReady > 0) { en.swordReady--; if (en.swordReady === 0 && Math.hypot(player.x - en.x, player.y - en.y) < 120) hitPlayer(3, true, en); return; }
-            if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { if (en.swordGlint > 0) { en.swordReady = 60; en.swordGlint = 0; } else { const a = Math.atan2(player.y - en.y, player.x - en.x); for(let i=-2; i<=2; i++) projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a+i*0.25)*7, vy: Math.sin(a+i*0.25)*7, life: 80, type: 'BULLET' }); en.cooldown = 480; } } return; }
+            if (en.attackPrep > 0) {
+                en.attackPrep--;
+                if (en.attackPrep === 0) {
+                    if (en.swordGlint > 0) { en.swordReady = 60; en.swordGlint = 0; }
+                    else {
+                        const a = Math.atan2(player.y - en.y, player.x - en.x);
+                        for(let i=-2; i<=2; i++) projectiles.push({ x: en.x, y: en.y, vx: Math.cos(a+i*0.25)*7, vy: Math.sin(a+i*0.25)*7, life: 80, type: 'BULLET' });
+                        en.cooldown = 480;
+                    }
+                }
+                return;
+            }
             if (d < 100) { en.attackPrep = 1; en.swordGlint = 1; }
             else if (en.cooldown === 0 && en.readyTimer === 0 && d < 500) { en.attackPrep = 60; en.quotes.push({t: "鉛玉くらえッ", l: 60, c: "black"}); }
             else approach(en, player.x, player.y, 2.5, 40, 24);
@@ -328,8 +352,14 @@
             if (en.cooldown > 0) { en.cooldown--; if (en.cooldown === 0) { en.quotes.push({t: "お色気よ", l: 60, c: "#ff69b4"}); en.readyTimer = 60; } }
             if (en.readyTimer > 0) en.readyTimer--;
             if (en.pauseTimer > 0) en.pauseTimer--;
-            else if (en.attackPrep > 0) { en.attackPrep--; if (en.attackPrep === 0) { projectiles.push({ x: en.x, y: en.y, vx: Math.cos(Math.atan2(player.y-en.y, player.x-en.x))*5, vy: Math.sin(Math.atan2(player.y-en.y, player.x-en.x))*5, life: 60, type: 'KISS', startLife: 60 }); en.cooldown = 300; } }
-            else { if (d < 65) { player.stunTimer = 180; en.pauseTimer = 30; } else if (en.cooldown === 0 && en.readyTimer === 0 && d < 400) { en.attackPrep = 40; en.quotes.push({t: "あら、いい男", l: 60, c: "#ff69b4"}); } else approach(en, player.x, player.y, 3.0, 30, 30); }
+            else if (en.attackPrep > 0) {
+                en.attackPrep--;
+                if (en.attackPrep === 0) {
+                    projectiles.push({ x: en.x, y: en.y, vx: Math.cos(Math.atan2(player.y-en.y, player.x-en.x))*5, vy: Math.sin(Math.atan2(player.y-en.y, player.x-en.x))*5, life: 60, type: 'KISS', startLife: 60 }); en.cooldown = 300; 
+                }
+            } else {
+                if (d < 65) { player.stunTimer = 180; en.pauseTimer = 30; } else if (en.cooldown === 0 && en.readyTimer === 0 && d < 400) { en.attackPrep = 40; en.quotes.push({t: "あら、いい男", l: 60, c: "#ff69b4"}); } else approach(en, player.x, player.y, 3.0, 30, 30);
+            }
         }
 
         function approach(en, tx, ty, spd, steps, pause) { const a = Math.atan2(ty - en.y, tx - en.x); en.x += Math.cos(a)*spd; en.y += Math.sin(a)*spd; en.moveStep++; if (en.moveStep % steps === 0) en.pauseTimer = pause; }
@@ -381,54 +411,86 @@
         }
 
         function triggerClear() { gameState = 'STAGE_CLEAR_WAIT'; ui.pauseContainer.style.display = 'none'; setTimeout(() => { showOverlay("STAGE CLEAR", 2000, () => { if(currentStage < 7) initStage(currentStage+1); else startEnding(); }); }, 1000); }
-        function startEnding() { gameState = 'ENDING'; endingPhase = 1; endingTimer = 0; ui.end.style.display = 'flex'; ui.endMain.style.display = 'block'; ui.endSub.style.display = 'none'; ui.endHint.style.display = 'none'; }
-        function updateEnding() {
-            endingTimer++; 
-            if (frameCount % 8 === 0) { const fx = Math.random() * canvas.width + camera.x, fy = Math.random() * canvas.height * 0.5 + camera.y; for(let i=0; i<30; i++) particles.push({ x: fx, y: fy, vx: Math.cos(Math.random()*7)*6, vy: Math.sin(Math.random()*7)*6, c: `hsl(${Math.random()*360},100%,50%)`, l: 60, s: Math.random()*5+2 }); }
-            if (endingPhase === 1 && endingTimer > 300) { endingPhase = 2; endingTimer = 0; ui.endMain.style.display = 'none'; ui.endSub.style.display = 'block'; } 
-            else if (endingPhase === 2 && endingTimer > 300) { endingPhase = 3; ui.endHint.style.display = 'block'; }
+
+        function startEnding() { 
+            gameState = 'ENDING_1'; endingPhase = 1; endingTimer = 0; 
+            ui.ending.style.display = 'flex'; ui.endMain.style.display = 'block'; 
+            ui.endSub.style.display = 'none'; ui.endHint.style.display = 'none'; 
         }
+
+        function updateEndingLogic() {
+            endingTimer++; 
+            // 共通の花火パーティクル
+            if (frameCount % 8 === 0) {
+                const fx = Math.random() * canvas.width, fy = Math.random() * canvas.height * 0.6;
+                for(let i=0; i<30; i++) particles.push({ x: fx, y: fy, vx: Math.cos(Math.random()*7)*6, vy: Math.sin(Math.random()*7)*6, c: `hsl(${Math.random()*360},100%,50%)`, l: 60, s: Math.random()*5+2 });
+            }
+
+            if (gameState === 'ENDING_1' && endingTimer > 300) {
+                gameState = 'ENDING_2'; endingTimer = 0;
+                ui.endMain.style.display = 'none';
+                ui.endSub.style.display = 'block';
+            } else if (gameState === 'ENDING_2' && endingTimer > 300) {
+                gameState = 'ENDING_TAP_WAIT';
+                ui.endSub.style.display = 'block'; // テキスト維持
+                ui.endMain.style.display = 'block'; // 終劇を再表示
+                ui.endHint.style.display = 'block';
+            }
+        }
+
         function onEndingClick() {
-            if (endingPhase === 3) {
-                ui.end.style.display = 'none'; ui.result.style.display = 'flex'; ui.resultHint.style.display = 'block'; ui.resultMenu.style.display = 'none'; gameState = 'RESULT';
+            if (gameState === 'ENDING_TAP_WAIT') {
+                ui.ending.style.display = 'none';
+                ui.result.style.display = 'flex';
+                gameState = 'RESULT_DISPLAY';
                 let html = `<p style="font-weight:bold; border-bottom:1px solid #fff; margin-bottom:10px;">討伐記録</p>`;
                 for (let type in stats.kills) html += `<p>${enemyNames[type] || type}: ${stats.kills[type]}体</p>`;
                 html += `<hr style="border:0.5px solid #555;"><p>被弾総ダメージ: ${stats.damageTaken}</p><p>使ったおにぎり: ${stats.itemsUsed}個</p>`;
                 ui.resultTxt.innerHTML = html;
             }
         }
-        function showResultMenu() { if (gameState === 'RESULT') { ui.resultHint.style.display = 'none'; ui.resultMenu.style.display = 'block'; } }
+
+        function showSecretMessage() {
+            if (gameState === 'RESULT_DISPLAY') {
+                ui.result.style.display = 'none';
+                ui.secret.style.display = 'flex';
+                ui.finalReturn.style.display = 'none';
+                gameState = 'SECRET_MESSAGE';
+            }
+        }
+
+        function showFinalReturnBtn() {
+            if (gameState === 'SECRET_MESSAGE') {
+                ui.finalReturn.style.display = 'inline-block';
+            }
+        }
 
         function drawCharacter(img, x, y, size, type, alive, glint = false, blur = 0, rot = 0) {
             ctx.save(); ctx.translate(x + blur, y); 
             if (!alive) ctx.rotate(Math.PI/2);
             else if (rot !== 0) ctx.rotate(rot);
             if (img.complete && img.naturalWidth !== 0) ctx.drawImage(img, -size/2, -size/2, size, size);
-            else { ctx.fillStyle = (type==='PLAYER')?"blue":"gray"; ctx.fillRect(-size/2, -size/2, size, size); }
+            else { ctx.fillStyle = (type==='PLAYER')?"blue":(type==='NINJA_YASHIKI')?"#441111":"gray"; ctx.fillRect(-size/2, -size/2, size, size); }
             if (glint) { ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.beginPath(); ctx.arc(0,0,size/2,0,7); ctx.fill(); }
             ctx.restore();
         }
 
         function draw() {
             ctx.clearRect(0,0,canvas.width,canvas.height);
-            if (gameState === 'TITLE' || gameState === 'GAMEOVER' || gameState === 'ENDING' || gameState === 'RESULT') return;
+            if (gameState === 'TITLE' || gameState === 'GAMEOVER' || gameState.includes('ENDING') || gameState.includes('RESULT') || gameState.includes('SECRET')) return;
             ctx.fillStyle = (currentStage === 7) ? wastelandPattern : groundPattern; ctx.fillRect(0,0,canvas.width,canvas.height);
             ctx.save(); ctx.translate(-camera.x, -camera.y);
             projectiles.forEach(p => { if (p.type === 'SHURIKEN' && p.vx === 0) { ctx.fillStyle = "#777"; ctx.fillRect(p.x-15, p.y-2, 30, 4); ctx.fillRect(p.x-2, p.y-15, 4, 30); } });
             items.forEach(it => { ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rotation); if (onigiriImg.complete) ctx.drawImage(onigiriImg, -24, -24, 48, 48); ctx.restore(); });
-            objects.forEach(obj => { 
-                let img = (obj.type==='TOUROU')?tourouImg: (obj.type==='TOUROU_HIRU')?tourouHiruImg: (obj.type==='NINJA_YASHIKI')?yashikiImg: jizoImg; 
-                drawCharacter(img, obj.x, obj.y, (obj.type==='NINJA_YASHIKI'?192:64), obj.type, true); 
-            });
+            objects.forEach(obj => { let img = (obj.type==='TOUROU')?tourouImg: (obj.type==='TOUROU_HIRU')?tourouHiruImg: (obj.type==='NINJA_YASHIKI')?yashikiImg: jizoImg; drawCharacter(img, obj.x, obj.y, (obj.type==='NINJA_YASHIKI'?192:64), obj.type, true); });
             enemies.forEach(en => {
                 let size = (en.type==='OKYO' || en.type==='YOUKO') ? 128 : (en.type==='TEPPO'? 80 : 64);
                 let img = en.type === 'NINJA' ? enemyImg : (en.type === 'ICHINOSUKE' ? yojimboImg : (en.type === 'OKYO' ? okyoImg : (en.type === 'TEPPO' ? teppoImg : (en.type === 'OBAKE' ? obakeImg : (en.type==='CHOUTIN' ? choutinImg : (en.type === 'BUNSHIN_MAIN' ? bunshinImg : (en.type==='GREY_NINJA'?greyImg:(en.type==='YOUKO'?youkoImg:shinonomeImg))))))));
                 drawCharacter(img, en.x, en.y, size, en.type, en.alive, en.swordGlint > 0 || en.swordReady > 0, en.blurX, en.rotation);
                 if (en.alive && en.attackPrep > 0) {
                     ctx.strokeStyle = (en.type==='YOUKO')?"#9400d3":"#00bfff"; ctx.lineWidth = 2; ctx.beginPath();
-                    if(en.type === 'YOUKO' && en.swordReady > 0) { // 近接予兆（長方形）
-                        const a = Math.atan2(player.y - en.y, player.x - en.x);
-                        ctx.save(); ctx.translate(en.x, en.y); ctx.rotate(a); ctx.fillStyle = "rgba(148,0,211,0.3)"; ctx.fillRect(0, -16, 128, 32); ctx.restore();
+                    if(en.type === 'YOUKO' && en.swordReady > 0) { 
+                        const a = Math.atan2(player.y - en.y, player.x - en.x); ctx.save(); ctx.translate(en.x, en.y); ctx.rotate(a); ctx.fillStyle = "rgba(148,0,211,0.3)"; ctx.fillRect(0, -32, 128, 64); ctx.restore();
                     } else {
                         let lx = en.x, ly = en.y - 40; ctx.moveTo(lx, ly); for(let i=0; i<5; i++) ctx.lineTo(lx + (Math.random()-0.5)*30, ly + i*15); ctx.stroke();
                     }
