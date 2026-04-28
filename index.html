@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>時代劇 ネコ忍者サバイバル Ver 1.54</title>
+    <title>時代劇 ネコ忍者サバイバル Ver 1.55</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Hiragino Mincho ProN', 'MS Mincho', serif; touch-action: none; }
         canvas { display: block; touch-action: none; background: #000; margin: 0 auto; }
@@ -21,11 +21,12 @@
 
         #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; z-index: 150; pointer-events: auto; }
         #pause-content { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
-        #pause-text-blink { font-size: 44px; color: #fff; font-weight: bold; animation: blink 0.8s infinite; margin-bottom: 30px; pointer-events: none; }
+        #pause-text-blink { font-size: 44px; color: #fff; font-weight: bold; animation: blink 0.8s infinite; margin-bottom: 20px; pointer-events: none; }
         
         #confirm-dialog { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); display: none; flex-direction: column; align-items: center; gap: 20px; z-index: 200; pointer-events: auto; background: rgba(20,20,20,0.95); padding: 30px 50px; border: 2px solid #fff; border-radius: 10px; }
 
-        #tutorial-dialog { position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #fff; padding: 20px 30px; border: 2px solid #ffd700; border-radius: 10px; z-index: 160; font-size: 18px; line-height: 1.6; text-align: left; display: none; pointer-events: none; min-width: 300px; }
+        /* チュートリアル：スマホでのボタン重なりを避けるため上部に配置 */
+        #tutorial-dialog { position: absolute; top: 10%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #fff; padding: 20px 25px; border: 2px solid #ffd700; border-radius: 10px; z-index: 160; font-size: 16px; line-height: 1.6; text-align: left; display: none; pointer-events: none; min-width: 280px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
 
         #ending-screen, #result-screen, #secret-screen { display: none; background: #000; z-index: 150; pointer-events: auto; }
         .result-box { background: rgba(255,255,255,0.1); padding: 30px; border-radius: 10px; min-width: 320px; text-align: left; margin-bottom: 20px; font-size: 18px; line-height: 2; border: 1px solid #444; }
@@ -77,7 +78,7 @@
             <h1 style="font-size: 48px; margin-bottom: 50px; border-top: 3px solid #fff; padding: 25px 0; letter-spacing: 0.1em;">ネコ忍者サバイバル</h1>
             <div class="ui-btn" style="width: 200px; font-size: 24px; background: #fff; color: #000; border: none;" onclick="startGame()">新規開始</div>
             <div class="ui-btn" style="width: 200px; font-size: 20px;" onclick="openAchievements()">実績</div>
-            <div class="version-tag">Ver 1.54</div>
+            <div class="version-tag">Ver 1.55</div>
         </div>
 
         <div id="gameover-screen" class="screen-text" style="display:none;" onclick="resetToTitle()">
@@ -117,7 +118,7 @@
         let gameState = 'TITLE', isPaused = false, currentStage = 1;
         let player, enemies = [], effects = [], particles = [], projectiles = [], objects = [], items = [];
         let joystick = { active: false, startX: 0, startY: 0, curX: 0, curY: 0 };
-        let camera = { x: 0, y: 0 }, frameCount = 0, finalPhase = 0, endingTimer = 0;
+        let camera = { x: 0, y: 0 }, frameCount = 0, finalPhase = 0, endingTimer = 0, tutTimeout = null;
         let groundPattern = null, wastelandPattern = null;
         let stats = { kills: {}, damageTaken: 0, itemsUsed: 0 };
 
@@ -153,7 +154,12 @@
         }
 
         function openAchievements() { alert("実績システム：開発中"); }
-        function showPauseTutorial() { ui.tutorial.style.display = 'block'; }
+        function showPauseTutorial() { 
+            ui.tutorial.style.display = 'block';
+            if(tutTimeout) clearTimeout(tutTimeout);
+            tutTimeout = setTimeout(() => { ui.tutorial.style.display = 'none'; }, 5000);
+        }
+
         function togglePause() { 
             if (gameState !== 'PLAYING') return; 
             isPaused = !isPaused; 
@@ -172,7 +178,7 @@
                 enemies.push(createEnemy(MAP_SIZE/2, MAP_SIZE/2 - 400, 'MUSCLE', 0));
                 for(let i=0; i<10; i++) objects.push({ x: Math.random()*(MAP_SIZE-200)+100, y: Math.random()*(MAP_SIZE-200)+100, type: 'TOUROU_HIRU' });
                 ui.tutorial.style.display = 'block';
-                setTimeout(() => { if(gameState === 'PLAYING' && !isPaused) ui.tutorial.style.display = 'none'; }, 5000);
+                tutTimeout = setTimeout(() => { if(gameState === 'PLAYING' && !isPaused) ui.tutorial.style.display = 'none'; }, 5000);
             } else if(num === 2) { 
                 enemies.push(createEnemy(MAP_SIZE/2, 200, 'NINJA', 0)); 
                 enemies.push(createEnemy(MAP_SIZE-200, MAP_SIZE/2, 'NINJA', 1));
@@ -298,9 +304,9 @@
                 en.attackPrep--;
                 if (en.attackPrep === 0) {
                     const a = Math.atan2(player.y - en.y, player.x - en.x);
-                    en.x += Math.cos(a) * 64; en.y += Math.sin(a) * 64; 
+                    en.x += Math.cos(a) * 64; en.y += Math.sin(a) * 64; // 1キャラ分接近タックル
                     if (Math.hypot(player.x - en.x, player.y - en.y) < 80) { hitPlayer(2); player.vx = Math.cos(a) * 45; player.vy = Math.sin(a) * 45; }
-                    en.pauseTimer = 30;
+                    en.pauseTimer = 30; // 0.5s休憩
                 }
                 return;
             }
@@ -422,8 +428,7 @@
         function showFinalReturnBtn() { if (gameState === 'SECRET_MESSAGE') { ui.finalReturn.style.display = 'inline-block'; } }
 
         function drawCharacter(img, x, y, size, type, alive, glint = false, blur = 0, rot = 0) {
-            ctx.save(); ctx.translate(x + blur, y); 
-            if (!alive) { ctx.rotate(type==='MUSCLE' ? Math.PI : Math.PI/2); } else if (rot !== 0) ctx.rotate(rot);
+            ctx.save(); ctx.translate(x + blur, y); if (!alive) { ctx.rotate(type==='MUSCLE' ? Math.PI : Math.PI/2); } else if (rot !== 0) ctx.rotate(rot);
             if (img.complete && img.naturalWidth !== 0) ctx.drawImage(img, -size/2, -size/2, size, size);
             else { ctx.fillStyle = (type==='PLAYER')?"blue":(type==='NINJA_YASHIKI')?"#441111":"gray"; ctx.fillRect(-size/2, -size/2, size, size); }
             if (glint) { ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.beginPath(); ctx.arc(0,0,size/2,0,7); ctx.fill(); }
@@ -435,7 +440,6 @@
             if (gameState === 'TITLE' || gameState === 'GAMEOVER' || gameState.includes('ENDING') || gameState.includes('RESULT') || gameState.includes('SECRET')) return;
             ctx.fillStyle = (currentStage === 8) ? wastelandPattern : groundPattern; ctx.fillRect(0,0,canvas.width,canvas.height);
             ctx.save(); ctx.translate(-camera.x, -camera.y);
-            // 地面の手裏剣
             projectiles.forEach(p => { if (p.type === 'SHURIKEN' && p.life <= 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.fillStyle = "#777"; ctx.fillRect(-12,-2,24,4); ctx.fillRect(-2,-12,4,24); ctx.restore(); } });
             items.forEach(it => { ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.rotation); if (onigiriImg.complete) ctx.drawImage(onigiriImg, -24, -24, 48, 48); ctx.restore(); });
             objects.forEach(obj => { let img = (obj.type==='TOUROU_HIRU')?tourouHiruImg: (obj.type==='NINJA_YASHIKI')?yashikiImg: jizoImg; drawCharacter(img, obj.x, obj.y, (obj.type==='NINJA_YASHIKI'?192:64), obj.type, true); });
@@ -444,7 +448,7 @@
                 let img = en.type === 'NINJA' ? enemyImg : (en.type === 'ICHINOSUKE' ? yojimboImg : (en.type === 'OKYO' ? okyoImg : (en.type === 'TEPPO' ? teppoImg : (en.type === 'OBAKE' ? obakeImg : (en.type==='CHOUTIN' ? choutinImg : (en.type === 'BUNSHIN_MAIN' ? bunshinImg : (en.type==='GREY_NINJA'?greyImg:(en.type==='YOUKO'?youkoImg:(en.type==='MUSCLE'?muscleImg:shinonomeImg)))))))));
                 drawCharacter(img, en.x, en.y, size, en.type, en.alive, en.swordGlint > 0 || en.swordReady > 0, en.blurX, en.rotation);
                 if (en.alive && en.attackPrep > 0) {
-                    ctx.strokeStyle = (en.type==='YOUKO')?"#9400d3":"#00bfff"; ctx.lineWidth = 2; ctx.beginPath();
+                    ctx.strokeStyle = (en.type==='MUSCLE'||en.type==='YOUKO')?"#9400d3":"#00bfff"; ctx.lineWidth = 2; ctx.beginPath();
                     if(en.type === 'YOUKO' && en.swordReady > 0) { const a = Math.atan2(player.y - en.y, player.x - en.x); ctx.save(); ctx.translate(en.x, en.y); ctx.rotate(a); ctx.fillStyle = "rgba(148,0,211,0.3)"; ctx.fillRect(0, -32, 128, 64); ctx.restore(); }
                     else if(en.type !== 'MUSCLE'){ let lx = en.x, ly = en.y - 40; ctx.moveTo(lx, ly); for(let i=0; i<5; i++) ctx.lineTo(lx + (Math.random()-0.5)*30, ly + i*15); ctx.stroke(); }
                 }
@@ -455,7 +459,7 @@
                 ctx.fillStyle = (p.type==='FOX_FIRE')?"#9400d3":(p.type==='BLUE_FIRE')?"#00ffff":"#ff4500";
                 if (p.type==='KISS') { ctx.font="30px serif"; ctx.fillText("💋", p.x-15, p.y+15); }
                 else if (p.type==='SHURIKEN') { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(frameCount*0.5); ctx.fillStyle="#777"; ctx.fillRect(-12,-2,24,4); ctx.restore(); }
-                else { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fill(); }
+                else if (p.type !== 'SHURIKEN'){ ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, 7); ctx.fill(); }
             });
             if (player.hp > 0) drawCharacter(playerImg, player.x, player.y, 64, 'PLAYER', true);
             particles.forEach(p => { ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.s, p.s); });
@@ -474,13 +478,13 @@
                 let size = (en.type==='OKYO'||en.type==='YOUKO'||en.type==='MUSCLE')?80:60;
                 if (en.alive && Math.hypot(wx - en.x, wy - en.y) < size && Math.hypot(player.x - en.x, player.y - en.y) < (size + 45)) { 
                     if (en.type === 'BUNSHIN_MAIN' && en.hitCount === 0) {
-                        spawnSmoke(en.x, en.y); // その場で煙
+                        spawnSmoke(en.x, en.y); 
                         en.hitCount = 1; en.quotes.push({t: "影分身の術", l: 60, c: "white"});
                         en.x = Math.random()*(MAP_SIZE-400)+200; en.y = Math.random()*(MAP_SIZE-400)+200;
                         for(let i=0; i<4; i++) enemies.push(createEnemy(en.x+(Math.random()-0.5)*150, en.y+(Math.random()-0.5)*150, 'GREY_NINJA', 500+i));
                     } else {
                         en.hp--; if (en.hp <= 0) { en.alive = false; onEnemyDeath(en); if(en.type==='MUSCLE') en.quotes.push({t:"ウガァッ", l:90, c:"red"}); if(en.type==='BUNSHIN_MAIN') en.quotes.push({t:"おのれ", l:90, c:"red"}); } 
-                        else if(en.type==='BUNSHIN_MAIN') spawnSmoke(en.x, en.y); // 被弾時煙
+                        else if(en.type==='BUNSHIN_MAIN') spawnSmoke(en.x, en.y); 
                     }
                 } 
             });
